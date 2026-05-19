@@ -356,6 +356,7 @@
   </div>
   <div class="meta">
     <span class="pill" id="hdrCloud" title="Cloud sync status" style="display:none">☁️ —</span>
+    <button class="icon-btn" id="hdrRefresh" title="Fetch latest from cloud" style="display:none" onclick="manualRefresh()">🔄</button>
     <span class="pill" id="hdrDate"></span>
     <select class="pill" id="hdrSwitch" title="Switch SSM" style="display:none"></select>
     <button class="icon-btn" id="hdrSignOut" title="Sign out / pick a different name" style="display:none" onclick="signOut()">🚪 Sign Out</button>
@@ -3876,6 +3877,21 @@ const SESSION_KEY = 'ecoSession_v1';
 const FB_CONFIG_KEY = 'ecoFbConfig_v1';
 const FB_DOC_PATH = ['dashboard', 'main']; // collection, doc
 
+/* =========================================================
+   BAKED FIREBASE CONFIG (pre-fed for zero-setup on every device)
+   SSMs need zero configuration — the page auto-connects on load.
+   To rotate keys, just replace this object and re-share the HTML.
+   ========================================================= */
+const BAKED_FB_CONFIG = {
+  apiKey: "AIzaSyBvTRBt75vTloaWlufxGXy8AY1UC9Vn2L0",
+  authDomain: "dabur-eco.firebaseapp.com",
+  projectId: "dabur-eco",
+  storageBucket: "dabur-eco.firebasestorage.app",
+  messagingSenderId: "388487179038",
+  appId: "1:388487179038:web:7bc313dcfd69c05695b70f",
+  measurementId: "G-D2T1RZHQR6"
+};
+
 // Firebase runtime state
 const FB = { app:null, db:null, auth:null, connected:false, listening:false, _pushDebounceId:null, _suppressNextPush:false };
 
@@ -3926,8 +3942,8 @@ function fmtDate(iso){
 
 function saveData(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
-  // mirror to cloud if enabled
-  if(FB.connected && FB.db && !FB._suppressNextPush){
+  // Only ADMIN pushes to cloud. SSMs are read-only — their localStorage caches stay private to their device.
+  if(FB.connected && FB.db && adminUnlocked && !FB._suppressNextPush){
     FB._pushDebounceId && clearTimeout(FB._pushDebounceId);
     FB._pushDebounceId = setTimeout(() => firebaseSave().catch(e => console.warn('FB save fail:', e)), 600);
   }
@@ -3950,9 +3966,16 @@ function setStoredFbConfig(cfg){ localStorage.setItem(FB_CONFIG_KEY, JSON.string
 function clearStoredFbConfig(){ localStorage.removeItem(FB_CONFIG_KEY); }
 function setCloudStatus(text, color){
   const pill = document.getElementById('hdrCloud');
-  if(pill){ pill.style.display = text ? 'inline-block' : 'none'; pill.textContent = text || ''; }
+  if(pill){
+    pill.style.display = text ? 'inline-block' : 'none';
+    pill.textContent = text || '';
+    if(color) pill.style.background = (color.includes('green') ? 'rgba(34,197,94,.28)' : color.includes('red') ? 'rgba(239,68,68,.28)' : 'rgba(255,255,255,.18)');
+  }
   const s = document.getElementById('fbStatus');
   if(s){ s.textContent = text || 'Not connected'; s.style.color = color || 'var(--ink)'; }
+  // Refresh button visibility tied to whether we're actively trying to be online
+  const r = document.getElementById('hdrRefresh');
+  if(r) r.style.display = (FB.connected || (text && text.includes('Connecting'))) ? 'inline-flex' : 'none';
 }
 
 // Parses a config that may be either valid JSON or a JS-object-literal-style paste (with unquoted keys)
@@ -3987,22 +4010,49 @@ function firebaseSubscribe(){
     if(!remote || !remote.payload) return;
     try {
       const incoming = JSON.parse(remote.payload);
-      // Avoid echo loops: compare timestamps; only adopt if remote is newer than what we last pushed
+      // Avoid echo loops: ignore our own writes coming back
       if(remote.updatedBy === FB._lastClientId && remote.updatedAt && FB._lastPushAt && remote.updatedAt === FB._lastPushAt) return;
-      FB._suppressNextPush = true;
-      DATA = incoming;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+      adoptRemoteData(incoming);
       setCloudStatus('☁️ Live · synced', 'var(--green-d)');
-      // re-render whatever's open
-      const active = document.querySelector('nav.tabs button.active');
-      if(active && currentSSM) showTab(active.dataset.tab);
-      if(adminUnlocked) showAdminPanel();
     } catch(e){ console.warn('Failed to apply remote data:', e); }
   }, err => {
     console.warn('FB onSnapshot err:', err);
     setCloudStatus('☁️ Offline', 'var(--red)');
   });
   FB.listening = true;
+}
+
+/* Adopt a freshly-fetched DATA payload and re-render whatever the user is looking at */
+function adoptRemoteData(incoming){
+  if(!incoming || typeof incoming !== 'object') return;
+  FB._suppressNextPush = true;
+  DATA = incoming;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+
+  // Re-populate the SSM picker (welcome screen) — names may have changed
+  const sel = document.getElementById('ssmPicker');
+  if(sel){
+    sel.innerHTML = '<option value="">— Select your name —</option>' +
+      DATA.ssms.map(s => `<option value="${s.id}" ${currentSSM===s.id?'selected':''}>${s.emoji||''} ${s.name} · ${s.region}</option>`).join('');
+  }
+
+  // If an SSM is signed in, refresh header switcher and re-render their active tab
+  if(currentSSM){
+    const stillExists = DATA.ssms.find(s => s.id === currentSSM);
+    if(stillExists){
+      refreshHeaderForSSM();
+      const active = document.querySelector('nav.tabs button.active');
+      showTab(active ? active.dataset.tab : 'my');
+    } else {
+      // SSM was deleted — drop them back to picker
+      signOut();
+    }
+  }
+
+  // If admin panel is open, refresh its grids too
+  if(adminUnlocked){
+    try { buildLmPeriodPicker(); buildLmTable(); buildEcoTable(); buildSSMEditor(); buildSKUEditor(); } catch(e){}
+  }
 }
 
 async function firebaseSave(){
@@ -4073,18 +4123,53 @@ async function pullCloudToLocal(){
   location.reload();
 }
 
-// Auto-init on boot if config saved
+// Auto-init on every page load: prefer baked config, fall back to admin-pasted one
 async function autoInitFirebase(){
-  const cfg = getStoredFbConfig();
+  const cfg = BAKED_FB_CONFIG || getStoredFbConfig();
   if(!cfg) return;
   try {
     setCloudStatus('☁️ Connecting…', 'var(--orange-d)');
     await initFirebaseFromConfig(cfg);
+
+    // 1) Immediate pull so the page shows the freshest data possible on every refresh
+    const [col, docId] = FB_DOC_PATH;
+    const snap = await FB.db.collection(col).doc(docId).get();
+    if(snap.exists && snap.data() && snap.data().payload){
+      try { adoptRemoteData(JSON.parse(snap.data().payload)); }
+      catch(e){ console.warn('Bad cloud payload:', e); }
+    }
+
+    // 2) Subscribe to live changes — when admin pushes new data, everyone sees it within ~1s
     firebaseSubscribe();
+
     setCloudStatus('☁️ Live', 'var(--green-d)');
+    // Show manual refresh button now that we're online
+    const r = document.getElementById('hdrRefresh');
+    if(r) r.style.display = 'inline-flex';
   } catch(e){
     console.warn('Auto-init FB failed:', e);
+    setCloudStatus('☁️ Offline · using cached', 'var(--red)');
+  }
+}
+
+// Manual "🔄 Refresh" button — force a fresh pull from Firestore
+async function manualRefresh(){
+  if(!FB.connected || !FB.db){ toast('Not connected to cloud'); return; }
+  setCloudStatus('☁️ Refreshing…', 'var(--orange-d)');
+  try {
+    const [col, docId] = FB_DOC_PATH;
+    const snap = await FB.db.collection(col).doc(docId).get();
+    if(snap.exists && snap.data() && snap.data().payload){
+      adoptRemoteData(JSON.parse(snap.data().payload));
+      setCloudStatus('☁️ Live · synced', 'var(--green-d)');
+      toast('Fresh data loaded ✨');
+    } else {
+      setCloudStatus('☁️ No cloud data yet', 'var(--muted)');
+      toast('Cloud has no data yet');
+    }
+  } catch(e){
     setCloudStatus('☁️ Offline', 'var(--red)');
+    toast('Refresh failed');
   }
 }
 
