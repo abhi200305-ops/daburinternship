@@ -1,0 +1,3292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Real ECO Dashboard · Dabur</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#fff7ed;
+    --bg2:#fff1d6;
+    --card:#ffffff;
+    --ink:#1f2937;
+    --muted:#6b7280;
+    --border:#fde6c2;
+    --orange:#f97316;
+    --orange-d:#ea580c;
+    --green:#16a34a;
+    --green-d:#15803d;
+    --red:#ef4444;
+    --amber:#f59e0b;
+    --blue:#3b82f6;
+    --purple:#8b5cf6;
+    --pink:#ec4899;
+    --shadow:0 4px 14px rgba(234,88,12,.08);
+    --shadow-lg:0 10px 30px rgba(234,88,12,.15);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
+  header{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-lg);position:sticky;top:0;z-index:100}
+  header .brand{display:flex;align-items:center;gap:14px;font-weight:700;font-size:20px}
+  header .logo{width:44px;height:44px;border-radius:12px;background:#fff;color:var(--orange-d);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px}
+  header .sub{font-size:12px;font-weight:500;opacity:.9}
+  header .meta{font-size:13px;display:flex;gap:14px;align-items:center}
+  header .pill{background:rgba(255,255,255,.18);padding:5px 12px;border-radius:999px;font-weight:600;backdrop-filter:blur(4px)}
+  header select.pill{appearance:none;-webkit-appearance:none;border:none;color:#fff;font-size:13px;font-weight:700;cursor:pointer;padding-right:28px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");background-repeat:no-repeat;background-position:right 10px center}
+  header select.pill option{color:#1f2937}
+  header select.pill:hover{background-color:rgba(255,255,255,.28)}
+  header .icon-btn{background:rgba(255,255,255,.18);border:none;color:#fff;font-size:13px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:background .15s}
+  header .icon-btn:hover{background:rgba(255,255,255,.32)}
+  nav.tabs{display:flex;gap:6px;padding:14px 28px 0;background:transparent;border-bottom:1px solid var(--border)}
+  nav.tabs button{background:transparent;border:none;padding:11px 18px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px;transition:all .15s}
+  nav.tabs button:hover{color:var(--ink);background:rgba(249,115,22,.06)}
+  nav.tabs button.active{color:var(--orange-d);background:var(--card);border:1px solid var(--border);border-bottom:1px solid var(--card);position:relative;top:1px}
+  main{padding:24px 28px 60px;max-width:1400px;margin:0 auto}
+  section.view{display:none;animation:fadeIn .25s ease}
+  section.view.active{display:block}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow);margin-bottom:18px}
+  .card h2{margin:0 0 4px;font-size:18px}
+  .card .desc{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .row{display:grid;gap:18px}
+  .row.cols-2{grid-template-columns:1fr 1fr}
+  .row.cols-3{grid-template-columns:repeat(3,1fr)}
+  .row.cols-4{grid-template-columns:repeat(4,1fr)}
+  @media (max-width:900px){.row.cols-2,.row.cols-3,.row.cols-4{grid-template-columns:1fr}}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .stat .label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .stat .value{font-size:28px;font-weight:800;color:var(--ink)}
+  .stat .delta{font-size:12px;font-weight:600}
+  .stat .delta.up{color:var(--green-d)}
+  .stat .delta.down{color:var(--red)}
+  .stat .icon{position:absolute;top:14px;right:14px;font-size:24px;opacity:.35}
+  /* Welcome / login picker */
+  .picker{max-width:520px;margin:60px auto;text-align:center}
+  .picker h1{font-size:28px;margin:0 0 6px}
+  .picker p{color:var(--muted);margin:0 0 22px}
+  .picker select,.picker input{width:100%;padding:14px;font-size:16px;border:2px solid var(--border);border-radius:12px;background:#fff;outline:none}
+  .picker select:focus,.picker input:focus{border-color:var(--orange)}
+  .btn{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border:none;padding:12px 20px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;transition:transform .1s,box-shadow .15s;display:inline-flex;align-items:center;gap:8px}
+  .btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+  .btn:active{transform:translateY(0)}
+  .btn.ghost{background:transparent;color:var(--orange-d);border:2px solid var(--orange)}
+  .btn.ghost:hover{background:rgba(249,115,22,.06)}
+  .btn.green{background:linear-gradient(135deg,#22c55e,#15803d)}
+  .btn.gray{background:#e5e7eb;color:var(--ink)}
+  .btn.danger{background:#ef4444}
+  /* SKU bars */
+  .sku-list{display:flex;flex-direction:column;gap:10px}
+  .sku-row{display:grid;grid-template-columns:1.4fr 2.6fr 80px;gap:14px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--border)}
+  .sku-row:last-child{border-bottom:none}
+  .sku-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .sku-name .brand-dot{width:8px;height:8px;border-radius:999px}
+  .sku-meta{font-size:11px;color:var(--muted);font-weight:500;margin-top:2px}
+  .bar-wrap{position:relative;height:24px;background:#f3f4f6;border-radius:8px;overflow:hidden}
+  .bar{height:100%;border-radius:8px;display:flex;align-items:center;padding-left:8px;color:#fff;font-size:11px;font-weight:700;transition:width .6s cubic-bezier(.4,0,.2,1)}
+  .bar.green{background:linear-gradient(90deg,#22c55e,#15803d)}
+  .bar.amber{background:linear-gradient(90deg,#f59e0b,#d97706)}
+  .bar.red{background:linear-gradient(90deg,#ef4444,#b91c1c)}
+  .target-line{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);opacity:.6}
+  .target-line::after{content:attr(data-label);position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:var(--ink);white-space:nowrap}
+  .sku-pct{text-align:right;font-weight:800;font-size:16px}
+  .sku-pct.green{color:var(--green-d)}
+  .sku-pct.amber{color:var(--amber)}
+  .sku-pct.red{color:var(--red)}
+  /* Medals */
+  .leaderboard{display:flex;flex-direction:column;gap:8px}
+  .lb-row{display:grid;grid-template-columns:50px 1.6fr 1fr 1fr 80px;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;background:#fafafa;border:1px solid var(--border);transition:transform .1s}
+  .lb-row:hover{transform:translateX(2px)}
+  .lb-row.you{background:linear-gradient(90deg,rgba(249,115,22,.12),rgba(249,115,22,.04));border-color:var(--orange)}
+  .lb-row.gold{background:linear-gradient(90deg,rgba(245,158,11,.15),rgba(245,158,11,.04));border-color:#f59e0b}
+  .lb-row.silver{background:linear-gradient(90deg,rgba(156,163,175,.18),rgba(156,163,175,.04));border-color:#9ca3af}
+  .lb-row.bronze{background:linear-gradient(90deg,rgba(217,119,6,.15),rgba(217,119,6,.04));border-color:#d97706}
+  .lb-rank{font-size:22px;font-weight:800;text-align:center}
+  .lb-name{font-size:14px;font-weight:700}
+  .lb-region{font-size:11px;color:var(--muted);font-weight:500}
+  .lb-score{font-size:18px;font-weight:800;color:var(--orange-d)}
+  .lb-bars{display:flex;gap:2px}
+  .lb-bars span{width:6px;border-radius:2px}
+  .lb-tag{font-size:10px;background:var(--orange);color:#fff;padding:2px 8px;border-radius:999px;font-weight:700;text-align:center}
+  /* Focus card */
+  .focus-hero{background:linear-gradient(135deg,#fb923c 0%,#ea580c 60%,#c2410c 100%);color:#fff;border-radius:20px;padding:28px;position:relative;overflow:hidden;box-shadow:var(--shadow-lg)}
+  .focus-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.08)}
+  .focus-hero::after{content:'';position:absolute;bottom:-60px;left:-30px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.06)}
+  .focus-hero .label{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.9}
+  .focus-hero .brand-name{font-size:38px;font-weight:900;line-height:1.1;margin:6px 0}
+  .focus-hero .sub{font-size:14px;opacity:.95}
+  .focus-hero .why{margin-top:14px;font-size:13px;background:rgba(0,0,0,.18);padding:10px 14px;border-radius:10px;display:inline-block}
+  .focus-skus{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .focus-sku{background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,.25)}
+  .focus-sku .n{font-size:13px;font-weight:700}
+  .focus-sku .g{font-size:11px;opacity:.85;margin-top:2px}
+  .focus-sku .v{font-size:20px;font-weight:800;margin-top:4px}
+  /* Badges */
+  .badge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+  .badge{background:linear-gradient(135deg,#fff,#fff7ed);border:2px solid var(--border);border-radius:14px;padding:12px;text-align:center;transition:transform .15s}
+  .badge.earned{border-color:var(--orange);background:linear-gradient(135deg,#fff,#ffedd5)}
+  .badge.locked{opacity:.4;filter:grayscale(.7)}
+  .badge:hover{transform:translateY(-2px)}
+  .badge .ico{font-size:32px;margin-bottom:4px}
+  .badge .nm{font-size:12px;font-weight:700;line-height:1.2}
+  .badge .ds{font-size:10px;color:var(--muted);margin-top:3px}
+  /* Streak ring */
+  .streak{display:flex;align-items:center;gap:14px}
+  .ring{position:relative;width:90px;height:90px}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800}
+  .ring .label .num{font-size:24px}
+  .ring .label .sub{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  /* Admin */
+  .admin-grid{overflow-x:auto;max-width:100%}
+  table.eco-table{border-collapse:collapse;width:100%;font-size:13px;min-width:900px}
+  table.eco-table th,table.eco-table td{border:1px solid var(--border);padding:6px 8px;text-align:center}
+  table.eco-table th{background:#fff7ed;font-weight:700;font-size:12px;position:sticky;top:0;z-index:5}
+  table.eco-table th.ssm-col,table.eco-table td.ssm-col{text-align:left;font-weight:700;background:#fffbf3;position:sticky;left:0;z-index:4}
+  table.eco-table th.ssm-col{z-index:6}
+  table.eco-table input{width:60px;padding:4px;border:1px solid #e5e7eb;border-radius:6px;text-align:center;font-size:13px;font-weight:600}
+  table.eco-table input:focus{outline:none;border-color:var(--orange);background:#fff7ed}
+  table.eco-table td.base input{background:#fef3c7;font-weight:800}
+  .admin-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+  .admin-toolbar input[type=date]{padding:8px 12px;border:2px solid var(--border);border-radius:8px;font-size:14px;font-weight:600}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .form-grid label{font-size:12px;color:var(--muted);font-weight:600;display:flex;flex-direction:column;gap:4px}
+  .form-grid input{padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:14px 20px;border-radius:10px;font-weight:600;font-size:14px;z-index:1000;animation:slideUp .25s ease;box-shadow:var(--shadow-lg)}
+  @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+  .legend{display:flex;gap:14px;font-size:11px;color:var(--muted);margin-top:8px}
+  .legend span{display:inline-flex;align-items:center;gap:4px}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  /* Confetti */
+  .confetti{position:fixed;width:8px;height:14px;top:-20px;pointer-events:none;z-index:9999;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+  /* Tooltip */
+  .help{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--muted);color:#fff;font-size:10px;font-weight:700;cursor:help;margin-left:6px}
+  details.adv{margin-top:14px;border:1px dashed var(--border);border-radius:10px;padding:10px 14px;background:#fffbf3}
+  details.adv summary{font-weight:700;cursor:pointer;font-size:13px;color:var(--orange-d)}
+  details.adv .body{margin-top:10px}
+  .brand-Real{background:#f97316}
+  .brand-Activ{background:#16a34a}
+  .brand-Koolerz{background:#3b82f6}
+  .brand-Hajmola{background:#8b5cf6}
+  .empty{text-align:center;padding:60px 20px;color:var(--muted)}
+  .empty .emoji{font-size:48px;margin-bottom:12px}
+  /* Chart containers — fixed height so Chart.js sizes properly */
+  .chart-box{position:relative;width:100%}
+  .chart-box.h-240{height:240px}
+  .chart-box.h-280{height:280px}
+  .chart-box.h-340{height:340px}
+  .chart-box.h-380{height:380px}
+  /* Team focus SKU card */
+  .focus-sku-hero{background:linear-gradient(135deg,#fef3c7 0%,#fcd34d 60%,#f59e0b 100%);color:#7c2d12;border-radius:20px;padding:24px;position:relative;overflow:hidden;box-shadow:var(--shadow-lg);border:2px solid #f59e0b}
+  .focus-sku-hero::before{content:'🎯';position:absolute;top:-20px;right:-10px;font-size:140px;opacity:.12}
+  .focus-sku-hero .label{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#92400e}
+  .focus-sku-hero .name{font-size:30px;font-weight:900;line-height:1.1;margin:6px 0;color:#7c2d12}
+  .focus-sku-hero .sub{font-size:13px;color:#78350f}
+  .focus-sku-hero .nums{display:flex;gap:16px;margin-top:14px}
+  .focus-sku-hero .nums .b{background:rgba(255,255,255,.55);border-radius:10px;padding:8px 12px;flex:1;text-align:center}
+  .focus-sku-hero .nums .b .v{font-size:22px;font-weight:900;color:#7c2d12}
+  .focus-sku-hero .nums .b .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400e}
+  .focus-sku-hero .who{margin-top:12px;font-size:13px;background:rgba(255,255,255,.5);padding:10px 14px;border-radius:10px;color:#7c2d12;font-weight:600}
+  /* Heatmap */
+  .heatmap{display:grid;gap:3px;font-size:11px;overflow-x:auto}
+  .hm-cell{padding:8px 6px;text-align:center;border-radius:6px;font-weight:700;min-width:60px;color:#fff;transition:transform .1s}
+  .hm-cell:hover{transform:scale(1.05);box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:2}
+  .hm-head{padding:8px 6px;font-size:10px;font-weight:700;text-align:center;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:#fffbf3;border-radius:6px;min-width:60px}
+  .hm-row-head{padding:8px 6px;font-size:12px;font-weight:700;text-align:left;color:var(--ink);background:#fffbf3;border-radius:6px;white-space:nowrap}
+  .month-picker-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+  .month-picker-row select{padding:8px 14px;border:2px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;background:#fff}
+  .delta-pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800}
+  .delta-pill.up{background:#dcfce7;color:#15803d}
+  .delta-pill.down{background:#fee2e2;color:#b91c1c}
+  .delta-pill.flat{background:#f3f4f6;color:#6b7280}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">R</div>
+    <div>
+      <div>Real ECO Dashboard</div>
+      <div class="sub">Sales Service Manager performance · Powered by Dabur</div>
+    </div>
+  </div>
+  <div class="meta">
+    <span class="pill" id="hdrDate"></span>
+    <select class="pill" id="hdrSwitch" title="Switch SSM" style="display:none"></select>
+    <button class="icon-btn" id="hdrSignOut" title="Sign out / pick a different name" style="display:none" onclick="signOut()">🚪 Sign Out</button>
+    <span class="pill" id="hdrUser">Pick your name →</span>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs" style="display:none">
+  <button data-tab="my" class="active">🎯 My Scorecard</button>
+  <button data-tab="lb">🏆 Leaderboard</button>
+  <button data-tab="focus">🔥 Focus Today</button>
+  <button data-tab="months">📅 Monthly</button>
+  <button data-tab="badges">🎖️ Badges & Streaks</button>
+  <button data-tab="admin">🔒 Admin</button>
+</nav>
+
+<main>
+
+  <!-- Picker / Welcome -->
+  <section class="view active" id="view-pick">
+    <div class="picker card">
+      <h1>👋 Welcome, SSM!</h1>
+      <p>Pick your name to see today's ECO scorecard and beat your team to the top.</p>
+      <select id="ssmPicker">
+        <option value="">— Select your name —</option>
+      </select>
+      <div style="height:14px"></div>
+      <button class="btn" onclick="enterDashboard()">Let's Go 🚀</button>
+      <div style="height:30px"></div>
+      <button class="btn ghost" onclick="openAdmin()">🔒 Admin Login</button>
+    </div>
+  </section>
+
+  <!-- My Scorecard -->
+  <section class="view" id="view-my">
+    <div class="row cols-4">
+      <div class="stat">
+        <div class="label">Overall Score</div>
+        <div class="value" id="myScore">—</div>
+        <div class="delta" id="myScoreDelta"></div>
+        <div class="icon">⭐</div>
+      </div>
+      <div class="stat">
+        <div class="label">Team Rank</div>
+        <div class="value" id="myRank">—</div>
+        <div class="delta" id="myRankDelta"></div>
+        <div class="icon">🏆</div>
+      </div>
+      <div class="stat">
+        <div class="label">SKUs On Target</div>
+        <div class="value" id="myOnTarget">—</div>
+        <div class="delta" id="myOnTargetSub"></div>
+        <div class="icon">✅</div>
+      </div>
+      <div class="stat">
+        <div class="label">Streak</div>
+        <div class="value" id="myStreak">— 🔥</div>
+        <div class="delta">Days above team avg</div>
+        <div class="icon">🔥</div>
+      </div>
+    </div>
+
+    <div class="row cols-2">
+      <div class="card">
+        <h2>📦 Your SKUs Today</h2>
+        <div class="desc">ECO% = your SKU ECO ÷ your Real 1L ECO × 100. The black tick shows the target.</div>
+        <div class="sku-list" id="mySkuList"></div>
+        <div class="legend">
+          <span><i style="background:linear-gradient(90deg,#22c55e,#15803d)"></i>≥ Target</span>
+          <span><i style="background:linear-gradient(90deg,#f59e0b,#d97706)"></i>Close (80%+ of target)</span>
+          <span><i style="background:linear-gradient(90deg,#ef4444,#b91c1c)"></i>Below 80% of target</span>
+        </div>
+      </div>
+      <div class="card">
+        <h2>🎯 Your Focus SKU Today</h2>
+        <div class="desc">The SKU where you have the biggest gap below target — knock this one out and your score jumps fastest.</div>
+        <div id="myFocus"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📈 Last 7 Days</h2>
+      <div class="desc">Your overall ECO attainment vs the team average.</div>
+      <div class="chart-box h-280"><canvas id="myTrend"></canvas></div>
+    </div>
+  </section>
+
+  <!-- Leaderboard -->
+  <section class="view" id="view-lb">
+    <div class="card">
+      <h2>🏆 Today's Leaderboard</h2>
+      <div class="desc">Ranked by overall ECO attainment (avg of ECO% ÷ Target across all non-base SKUs, capped at 100%).</div>
+      <div class="leaderboard" id="lbList"></div>
+    </div>
+    <div class="row cols-2">
+      <div class="card">
+        <h2>📊 Team SKU Performance</h2>
+        <div class="desc">Average ECO% across all SSMs, vs target.</div>
+        <div class="chart-box h-380"><canvas id="teamSkuChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>🥇 Hall of Fame</h2>
+        <div class="desc">SSM holding the highest ECO% per SKU today.</div>
+        <div id="kingsList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Focus Today -->
+  <section class="view" id="view-focus">
+    <div class="row cols-2">
+      <div class="focus-sku-hero" id="focusSkuHero"></div>
+      <div class="focus-hero" id="focusHero"></div>
+    </div>
+    <div style="height:18px"></div>
+    <div class="row cols-2">
+      <div class="card">
+        <h2>🗺️ Where Does the Team Stand?</h2>
+        <div class="desc">Focus brand performance across all SSMs.</div>
+        <div class="chart-box h-280"><canvas id="focusBrandChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>💡 Tactical Playbook</h2>
+        <div class="desc">Auto-generated nudges based on today's data.</div>
+        <ul id="playbook" style="line-height:1.7;font-size:14px"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Monthly -->
+  <section class="view" id="view-months">
+    <div class="card">
+      <h2>📅 Monthly Performance</h2>
+      <div class="desc">Compare this month with last month. Pick a different month to drill in.</div>
+      <div class="month-picker-row">
+        <label style="font-size:12px;color:var(--muted);font-weight:700">View Month:</label>
+        <select id="monthPicker"></select>
+        <label style="font-size:12px;color:var(--muted);font-weight:700;margin-left:14px">Compare With:</label>
+        <select id="monthCompare"></select>
+        <span style="flex:1"></span>
+        <label style="font-size:12px;color:var(--muted);font-weight:700">SSM:</label>
+        <select id="monthSsmPicker"></select>
+      </div>
+    </div>
+
+    <div class="row cols-4">
+      <div class="stat">
+        <div class="label">Avg Score This Period</div>
+        <div class="value" id="mScore">—</div>
+        <div class="delta" id="mScoreDelta"></div>
+        <div class="icon">📊</div>
+      </div>
+      <div class="stat">
+        <div class="label">vs Comparison Period</div>
+        <div class="value" id="mDelta">—</div>
+        <div class="delta" id="mDeltaSub"></div>
+        <div class="icon">🆚</div>
+      </div>
+      <div class="stat">
+        <div class="label">Best Day</div>
+        <div class="value" id="mBestDay">—</div>
+        <div class="delta" id="mBestDaySub"></div>
+        <div class="icon">⭐</div>
+      </div>
+      <div class="stat">
+        <div class="label">Most Improved SKU</div>
+        <div class="value" id="mTopSku">—</div>
+        <div class="delta" id="mTopSkuSub"></div>
+        <div class="icon">🚀</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📈 Monthly Attainment Trend</h2>
+      <div class="desc">Daily overall ECO attainment for the selected SSM vs team average.</div>
+      <div class="chart-box h-280"><canvas id="monthTrend"></canvas></div>
+    </div>
+
+    <div class="row cols-2">
+      <div class="card">
+        <h2>🆚 This Month vs Comparison — by SKU</h2>
+        <div class="desc">Avg ECO% per SKU. Green = improved, red = declined.</div>
+        <div class="chart-box h-380"><canvas id="monthSkuCompare"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>🏆 Monthly Leaderboard</h2>
+        <div class="desc">Avg overall attainment across the selected month.</div>
+        <div id="monthLeaderboard"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🔥 Team Heatmap — Avg ECO% (Selected Month)</h2>
+      <div class="desc">Rows = SSMs, columns = SKUs. Hot = above target, cool = below.</div>
+      <div id="monthHeatmap"></div>
+    </div>
+  </section>
+
+  <!-- Badges & Streaks -->
+  <section class="view" id="view-badges">
+    <div class="row cols-2">
+      <div class="card">
+        <h2>🔥 Your Streak</h2>
+        <div class="streak">
+          <div class="ring">
+            <svg width="90" height="90">
+              <circle cx="45" cy="45" r="38" stroke="#fed7aa" stroke-width="8" fill="none"/>
+              <circle cx="45" cy="45" r="38" stroke="#ea580c" stroke-width="8" fill="none" id="streakRing" stroke-linecap="round" stroke-dasharray="238.76" stroke-dashoffset="238.76"/>
+            </svg>
+            <div class="label"><div class="num" id="streakNum">0</div><div class="sub">days</div></div>
+          </div>
+          <div>
+            <div style="font-size:14px;color:var(--muted);font-weight:600">Above team average for</div>
+            <div style="font-size:22px;font-weight:800" id="streakText">0 days in a row 🔥</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">Hit 7 days for the Hot Streak badge!</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>📅 Today vs Yesterday</h2>
+        <div id="dod"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>🎖️ Your Badges</h2>
+      <div class="desc">Earn badges by topping specific brand families, hitting all targets, or making big comebacks.</div>
+      <div class="badge-grid" id="badgeGrid"></div>
+    </div>
+  </section>
+
+  <!-- Admin -->
+  <section class="view" id="view-admin">
+    <div id="adminLogin" class="picker card">
+      <h1>🔒 Admin Login</h1>
+      <p>Enter the admin password to update ECO numbers.</p>
+      <input type="password" id="adminPwd" placeholder="Password" onkeydown="if(event.key==='Enter')adminLogin()" />
+      <div style="height:14px"></div>
+      <button class="btn" onclick="adminLogin()">Unlock 🔓</button>
+      <div style="height:10px"></div>
+      <button class="btn ghost" onclick="showTab('my')">← Back</button>
+    </div>
+
+    <div id="adminPanel" style="display:none">
+      <div class="card">
+        <h2>📝 Daily ECO Entry</h2>
+        <div class="desc">Type each SSM's raw ECO count per SKU. <strong>Real 1L is the base</strong> (yellow column) — ECO% for every other SKU is computed as <code>SKU ÷ Real 1L × 100</code>.</div>
+        <div class="admin-toolbar">
+          <label style="font-size:12px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px">
+            Date:
+            <input type="date" id="adminDate"/>
+          </label>
+          <button class="btn green" onclick="saveDay()">💾 Save Today's Data</button>
+          <button class="btn ghost" onclick="copyFromPrevious()">📋 Copy from Previous Day</button>
+          <button class="btn gray" onclick="clearDay()">🧹 Clear Date</button>
+          <span style="flex:1"></span>
+          <button class="btn" onclick="exportHTML()">📤 Download Updated HTML</button>
+        </div>
+        <div class="admin-grid">
+          <table class="eco-table" id="ecoTable"></table>
+        </div>
+      </div>
+
+      <details class="adv">
+        <summary>⚙️ Configure SSMs, SKUs & Targets</summary>
+        <div class="body">
+          <div class="row cols-2">
+            <div>
+              <h3 style="font-size:14px;margin:0 0 8px">👥 SSMs</h3>
+              <div id="ssmEditor"></div>
+              <button class="btn ghost" onclick="addSSM()" style="margin-top:8px">+ Add SSM</button>
+            </div>
+            <div>
+              <h3 style="font-size:14px;margin:0 0 8px">📦 SKUs & Targets (%)</h3>
+              <div id="skuEditor"></div>
+              <div style="font-size:11px;color:var(--muted);margin-top:8px">Target is the ECO% goal for that SKU (i.e., what % of Real 1L outlets should also stock it).</div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="adv">
+        <summary>🔑 Change Admin Password</summary>
+        <div class="body">
+          <div class="form-grid">
+            <label>New Password
+              <input type="password" id="newPwd1"/>
+            </label>
+            <label>Confirm
+              <input type="password" id="newPwd2"/>
+            </label>
+          </div>
+          <button class="btn" onclick="changePwd()" style="margin-top:10px">Update Password</button>
+        </div>
+      </details>
+
+      <details class="adv" open>
+        <summary>📥 Bulk Upload — Historical / April Data (CSV)</summary>
+        <div class="body">
+          <p style="font-size:13px;margin:4px 0 10px">Upload many days of ECO numbers in one go (perfect for backfilling April, last month, etc.).</p>
+          <ol style="font-size:13px;line-height:1.7;color:var(--ink);padding-left:20px;margin:0 0 12px">
+            <li>Click <strong>⬇️ Download Template</strong> — gives you a CSV pre-filled with your SSMs.</li>
+            <li>Open it in Excel. Fill <strong>one row per (date, SSM)</strong>. Use the date format <code>YYYY-MM-DD</code> (e.g. <code>2026-04-15</code>).</li>
+            <li>Each SKU is a column. Enter the <strong>raw ECO count</strong> (number of outlets), not the percentage.</li>
+            <li>Save as CSV and click <strong>⬆️ Upload CSV</strong>.</li>
+          </ol>
+          <div style="background:#fffbf3;border:1px dashed var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:12px">
+            <strong>Column order:</strong> <code>date, ssm_id, ssm_name, real1l, real125, real200, realPet, activ1l, realActivCwApet, realActivCwPet, koolerzDrinks, koolerzPet, hajmola</code><br>
+            <code>real1l</code> is the <strong>base</strong> — every other SKU's ECO% is computed as <code>(SKU ÷ real1l) × 100</code>.
+          </div>
+          <button class="btn ghost" onclick="downloadCSVTemplate()">⬇️ Download Template (with your SSMs)</button>
+          <button class="btn" onclick="document.getElementById('csvInput').click()">⬆️ Upload CSV</button>
+          <input type="file" id="csvInput" accept=".csv,text/csv" style="display:none" onchange="uploadCSV(this.files[0])"/>
+          <div id="csvLog" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+        </div>
+      </details>
+
+      <details class="adv">
+        <summary>💾 Backup / Restore Data</summary>
+        <div class="body">
+          <p style="font-size:13px;color:var(--muted);margin-top:4px">Download a JSON backup or paste one in to restore.</p>
+          <button class="btn ghost" onclick="downloadJSON()">⬇️ Download JSON Backup</button>
+          <button class="btn ghost" onclick="document.getElementById('restoreInput').click()">⬆️ Restore from JSON</button>
+          <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="restoreJSON(this)"/>
+          <button class="btn danger" onclick="resetAll()" style="float:right">⚠️ Reset Everything</button>
+        </div>
+      </details>
+
+      <div style="text-align:center;margin-top:20px">
+        <button class="btn gray" onclick="adminLogout()">Logout</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Default data embedded -->
+<script id="default-data" type="application/json">
+{
+  "config": {
+    "adminPasswordHash": "ef31506c05a8c262c3ee8e6c1328d7140981e8027b86e88d618ac04f970c16b9",
+    "companyName": "Dabur",
+    "team": "Real Sales Team",
+    "lastUpdated": "2026-05-19"
+  },
+  "ssms": [
+    {
+      "id": "ssm1",
+      "name": "Rajesh Kumar",
+      "region": "Delhi NCR",
+      "emoji": "\ud83e\udd81"
+    },
+    {
+      "id": "ssm2",
+      "name": "Priya Sharma",
+      "region": "Mumbai West",
+      "emoji": "\ud83d\udc2f"
+    },
+    {
+      "id": "ssm3",
+      "name": "Arjun Reddy",
+      "region": "Bangalore",
+      "emoji": "\ud83e\udd85"
+    },
+    {
+      "id": "ssm4",
+      "name": "Sneha Iyer",
+      "region": "Chennai",
+      "emoji": "\ud83e\udd8b"
+    },
+    {
+      "id": "ssm5",
+      "name": "Vikram Singh",
+      "region": "Jaipur",
+      "emoji": "\ud83d\udc3a"
+    },
+    {
+      "id": "ssm6",
+      "name": "Anjali Verma",
+      "region": "Kolkata",
+      "emoji": "\ud83e\udd8a"
+    },
+    {
+      "id": "ssm7",
+      "name": "Karan Mehta",
+      "region": "Ahmedabad",
+      "emoji": "\ud83d\udc09"
+    },
+    {
+      "id": "ssm8",
+      "name": "Pooja Nair",
+      "region": "Hyderabad",
+      "emoji": "\ud83e\udd9a"
+    }
+  ],
+  "skus": [
+    {
+      "id": "real1l",
+      "name": "Real 1 Ltr",
+      "brand": "Real",
+      "isBase": true,
+      "target": 100
+    },
+    {
+      "id": "real125",
+      "name": "Real 125ml",
+      "brand": "Real",
+      "target": 55
+    },
+    {
+      "id": "real200",
+      "name": "Real 200ml",
+      "brand": "Real",
+      "target": 70
+    },
+    {
+      "id": "realPet",
+      "name": "Real Pet",
+      "brand": "Real",
+      "target": 80
+    },
+    {
+      "id": "activ1l",
+      "name": "Activ 1 Ltr",
+      "brand": "Activ",
+      "target": 55
+    },
+    {
+      "id": "realActivCwApet",
+      "name": "Real Activ Coconut Water APET",
+      "brand": "Activ",
+      "target": 35
+    },
+    {
+      "id": "realActivCwPet",
+      "name": "Real Activ Coconut Water Pet",
+      "brand": "Activ",
+      "target": 30
+    },
+    {
+      "id": "koolerzDrinks",
+      "name": "Real Drinks Koolerz",
+      "brand": "Koolerz",
+      "target": 45
+    },
+    {
+      "id": "koolerzPet",
+      "name": "Real Koolerz Pet",
+      "brand": "Koolerz",
+      "target": 40
+    },
+    {
+      "id": "hajmola",
+      "name": "Hajmola Drink",
+      "brand": "Hajmola",
+      "target": 50
+    }
+  ],
+  "eco": {
+    "2026-04-04": {
+      "ssm1": {
+        "real1l": 94,
+        "real125": 39,
+        "real200": 57,
+        "realPet": 67,
+        "activ1l": 46,
+        "realActivCwApet": 28,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 34,
+        "koolerzPet": 30,
+        "hajmola": 37
+      },
+      "ssm2": {
+        "real1l": 80,
+        "real125": 37,
+        "real200": 48,
+        "realPet": 57,
+        "activ1l": 39,
+        "realActivCwApet": 23,
+        "realActivCwPet": 18,
+        "koolerzDrinks": 33,
+        "koolerzPet": 28,
+        "hajmola": 32
+      },
+      "ssm3": {
+        "real1l": 84,
+        "real125": 41,
+        "real200": 52,
+        "realPet": 58,
+        "activ1l": 45,
+        "realActivCwApet": 28,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 29,
+        "koolerzPet": 29,
+        "hajmola": 31
+      },
+      "ssm4": {
+        "real1l": 79,
+        "real125": 33,
+        "real200": 48,
+        "realPet": 56,
+        "activ1l": 36,
+        "realActivCwApet": 22,
+        "realActivCwPet": 18,
+        "koolerzDrinks": 30,
+        "koolerzPet": 24,
+        "hajmola": 33
+      },
+      "ssm5": {
+        "real1l": 91,
+        "real125": 42,
+        "real200": 55,
+        "realPet": 65,
+        "activ1l": 37,
+        "realActivCwApet": 23,
+        "realActivCwPet": 18,
+        "koolerzDrinks": 33,
+        "koolerzPet": 30,
+        "hajmola": 43
+      },
+      "ssm6": {
+        "real1l": 76,
+        "real125": 36,
+        "real200": 49,
+        "realPet": 59,
+        "activ1l": 35,
+        "realActivCwApet": 23,
+        "realActivCwPet": 19,
+        "koolerzDrinks": 32,
+        "koolerzPet": 23,
+        "hajmola": 36
+      },
+      "ssm7": {
+        "real1l": 89,
+        "real125": 44,
+        "real200": 56,
+        "realPet": 65,
+        "activ1l": 45,
+        "realActivCwApet": 27,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 31,
+        "koolerzPet": 27,
+        "hajmola": 37
+      },
+      "ssm8": {
+        "real1l": 69,
+        "real125": 33,
+        "real200": 47,
+        "realPet": 46,
+        "activ1l": 33,
+        "realActivCwApet": 20,
+        "realActivCwPet": 16,
+        "koolerzDrinks": 27,
+        "koolerzPet": 21,
+        "hajmola": 28
+      }
+    },
+    "2026-04-08": {
+      "ssm1": {
+        "real1l": 95,
+        "real125": 41,
+        "real200": 62,
+        "realPet": 77,
+        "activ1l": 45,
+        "realActivCwApet": 27,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 38,
+        "koolerzPet": 29,
+        "hajmola": 38
+      },
+      "ssm2": {
+        "real1l": 81,
+        "real125": 38,
+        "real200": 56,
+        "realPet": 60,
+        "activ1l": 36,
+        "realActivCwApet": 23,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 33,
+        "koolerzPet": 29,
+        "hajmola": 37
+      },
+      "ssm3": {
+        "real1l": 76,
+        "real125": 42,
+        "real200": 56,
+        "realPet": 63,
+        "activ1l": 41,
+        "realActivCwApet": 30,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 31,
+        "koolerzPet": 28,
+        "hajmola": 34
+      },
+      "ssm4": {
+        "real1l": 81,
+        "real125": 32,
+        "real200": 48,
+        "realPet": 50,
+        "activ1l": 40,
+        "realActivCwApet": 23,
+        "realActivCwPet": 17,
+        "koolerzDrinks": 30,
+        "koolerzPet": 24,
+        "hajmola": 31
+      },
+      "ssm5": {
+        "real1l": 94,
+        "real125": 47,
+        "real200": 61,
+        "realPet": 69,
+        "activ1l": 37,
+        "realActivCwApet": 24,
+        "realActivCwPet": 18,
+        "koolerzDrinks": 38,
+        "koolerzPet": 32,
+        "hajmola": 48
+      },
+      "ssm6": {
+        "real1l": 77,
+        "real125": 36,
+        "real200": 55,
+        "realPet": 60,
+        "activ1l": 33,
+        "realActivCwApet": 23,
+        "realActivCwPet": 19,
+        "koolerzDrinks": 33,
+        "koolerzPet": 26,
+        "hajmola": 35
+      },
+      "ssm7": {
+        "real1l": 84,
+        "real125": 44,
+        "real200": 54,
+        "realPet": 68,
+        "activ1l": 43,
+        "realActivCwApet": 25,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 36,
+        "koolerzPet": 28,
+        "hajmola": 38
+      },
+      "ssm8": {
+        "real1l": 80,
+        "real125": 32,
+        "real200": 45,
+        "realPet": 49,
+        "activ1l": 31,
+        "realActivCwApet": 19,
+        "realActivCwPet": 15,
+        "koolerzDrinks": 28,
+        "koolerzPet": 21,
+        "hajmola": 28
+      }
+    },
+    "2026-04-12": {
+      "ssm1": {
+        "real1l": 89,
+        "real125": 45,
+        "real200": 60,
+        "realPet": 78,
+        "activ1l": 49,
+        "realActivCwApet": 27,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 39,
+        "koolerzPet": 30,
+        "hajmola": 39
+      },
+      "ssm2": {
+        "real1l": 94,
+        "real125": 39,
+        "real200": 54,
+        "realPet": 65,
+        "activ1l": 42,
+        "realActivCwApet": 23,
+        "realActivCwPet": 18,
+        "koolerzDrinks": 33,
+        "koolerzPet": 28,
+        "hajmola": 36
+      },
+      "ssm3": {
+        "real1l": 87,
+        "real125": 43,
+        "real200": 60,
+        "realPet": 60,
+        "activ1l": 43,
+        "realActivCwApet": 30,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 31,
+        "koolerzPet": 27,
+        "hajmola": 32
+      },
+      "ssm4": {
+        "real1l": 77,
+        "real125": 32,
+        "real200": 48,
+        "realPet": 58,
+        "activ1l": 38,
+        "realActivCwApet": 24,
+        "realActivCwPet": 18,
+        "koolerzDrinks": 28,
+        "koolerzPet": 26,
+        "hajmola": 35
+      },
+      "ssm5": {
+        "real1l": 99,
+        "real125": 51,
+        "real200": 63,
+        "realPet": 67,
+        "activ1l": 41,
+        "realActivCwApet": 24,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 33,
+        "koolerzPet": 30,
+        "hajmola": 50
+      },
+      "ssm6": {
+        "real1l": 78,
+        "real125": 42,
+        "real200": 52,
+        "realPet": 57,
+        "activ1l": 39,
+        "realActivCwApet": 26,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 33,
+        "koolerzPet": 24,
+        "hajmola": 37
+      },
+      "ssm7": {
+        "real1l": 93,
+        "real125": 45,
+        "real200": 58,
+        "realPet": 68,
+        "activ1l": 42,
+        "realActivCwApet": 28,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 37,
+        "koolerzPet": 28,
+        "hajmola": 43
+      },
+      "ssm8": {
+        "real1l": 71,
+        "real125": 30,
+        "real200": 47,
+        "realPet": 51,
+        "activ1l": 32,
+        "realActivCwApet": 20,
+        "realActivCwPet": 17,
+        "koolerzDrinks": 27,
+        "koolerzPet": 23,
+        "hajmola": 31
+      }
+    },
+    "2026-04-16": {
+      "ssm1": {
+        "real1l": 97,
+        "real125": 46,
+        "real200": 64,
+        "realPet": 81,
+        "activ1l": 45,
+        "realActivCwApet": 30,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 39,
+        "koolerzPet": 34,
+        "hajmola": 41
+      },
+      "ssm2": {
+        "real1l": 87,
+        "real125": 41,
+        "real200": 52,
+        "realPet": 63,
+        "activ1l": 44,
+        "realActivCwApet": 27,
+        "realActivCwPet": 18,
+        "koolerzDrinks": 33,
+        "koolerzPet": 28,
+        "hajmola": 39
+      },
+      "ssm3": {
+        "real1l": 91,
+        "real125": 45,
+        "real200": 56,
+        "realPet": 62,
+        "activ1l": 47,
+        "realActivCwApet": 32,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 35,
+        "koolerzPet": 30,
+        "hajmola": 30
+      },
+      "ssm4": {
+        "real1l": 84,
+        "real125": 33,
+        "real200": 52,
+        "realPet": 60,
+        "activ1l": 37,
+        "realActivCwApet": 21,
+        "realActivCwPet": 17,
+        "koolerzDrinks": 31,
+        "koolerzPet": 24,
+        "hajmola": 35
+      },
+      "ssm5": {
+        "real1l": 97,
+        "real125": 47,
+        "real200": 63,
+        "realPet": 69,
+        "activ1l": 42,
+        "realActivCwApet": 28,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 34,
+        "koolerzPet": 31,
+        "hajmola": 46
+      },
+      "ssm6": {
+        "real1l": 77,
+        "real125": 43,
+        "real200": 55,
+        "realPet": 57,
+        "activ1l": 38,
+        "realActivCwApet": 25,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 30,
+        "koolerzPet": 24,
+        "hajmola": 42
+      },
+      "ssm7": {
+        "real1l": 94,
+        "real125": 46,
+        "real200": 62,
+        "realPet": 68,
+        "activ1l": 43,
+        "realActivCwApet": 26,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 38,
+        "koolerzPet": 32,
+        "hajmola": 43
+      },
+      "ssm8": {
+        "real1l": 83,
+        "real125": 31,
+        "real200": 45,
+        "realPet": 47,
+        "activ1l": 36,
+        "realActivCwApet": 23,
+        "realActivCwPet": 16,
+        "koolerzDrinks": 29,
+        "koolerzPet": 22,
+        "hajmola": 33
+      }
+    },
+    "2026-04-20": {
+      "ssm1": {
+        "real1l": 106,
+        "real125": 49,
+        "real200": 68,
+        "realPet": 82,
+        "activ1l": 45,
+        "realActivCwApet": 31,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 43,
+        "koolerzPet": 35,
+        "hajmola": 46
+      },
+      "ssm2": {
+        "real1l": 97,
+        "real125": 39,
+        "real200": 59,
+        "realPet": 61,
+        "activ1l": 44,
+        "realActivCwApet": 27,
+        "realActivCwPet": 19,
+        "koolerzDrinks": 37,
+        "koolerzPet": 29,
+        "hajmola": 36
+      },
+      "ssm3": {
+        "real1l": 92,
+        "real125": 41,
+        "real200": 54,
+        "realPet": 63,
+        "activ1l": 45,
+        "realActivCwApet": 34,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 32,
+        "koolerzPet": 31,
+        "hajmola": 33
+      },
+      "ssm4": {
+        "real1l": 88,
+        "real125": 35,
+        "real200": 55,
+        "realPet": 53,
+        "activ1l": 43,
+        "realActivCwApet": 22,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 31,
+        "koolerzPet": 23,
+        "hajmola": 35
+      },
+      "ssm5": {
+        "real1l": 100,
+        "real125": 49,
+        "real200": 64,
+        "realPet": 74,
+        "activ1l": 43,
+        "realActivCwApet": 27,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 39,
+        "koolerzPet": 29,
+        "hajmola": 52
+      },
+      "ssm6": {
+        "real1l": 86,
+        "real125": 43,
+        "real200": 57,
+        "realPet": 62,
+        "activ1l": 37,
+        "realActivCwApet": 23,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 32,
+        "koolerzPet": 26,
+        "hajmola": 42
+      },
+      "ssm7": {
+        "real1l": 93,
+        "real125": 45,
+        "real200": 58,
+        "realPet": 67,
+        "activ1l": 46,
+        "realActivCwApet": 27,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 36,
+        "koolerzPet": 33,
+        "hajmola": 43
+      },
+      "ssm8": {
+        "real1l": 85,
+        "real125": 34,
+        "real200": 47,
+        "realPet": 52,
+        "activ1l": 32,
+        "realActivCwApet": 21,
+        "realActivCwPet": 17,
+        "koolerzDrinks": 30,
+        "koolerzPet": 24,
+        "hajmola": 32
+      }
+    },
+    "2026-04-24": {
+      "ssm1": {
+        "real1l": 101,
+        "real125": 45,
+        "real200": 66,
+        "realPet": 84,
+        "activ1l": 52,
+        "realActivCwApet": 29,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 41,
+        "koolerzPet": 35,
+        "hajmola": 43
+      },
+      "ssm2": {
+        "real1l": 99,
+        "real125": 43,
+        "real200": 60,
+        "realPet": 64,
+        "activ1l": 41,
+        "realActivCwApet": 24,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 36,
+        "koolerzPet": 32,
+        "hajmola": 36
+      },
+      "ssm3": {
+        "real1l": 88,
+        "real125": 45,
+        "real200": 57,
+        "realPet": 70,
+        "activ1l": 47,
+        "realActivCwApet": 31,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 31,
+        "koolerzPet": 32,
+        "hajmola": 36
+      },
+      "ssm4": {
+        "real1l": 78,
+        "real125": 35,
+        "real200": 50,
+        "realPet": 62,
+        "activ1l": 41,
+        "realActivCwApet": 22,
+        "realActivCwPet": 18,
+        "koolerzDrinks": 34,
+        "koolerzPet": 25,
+        "hajmola": 38
+      },
+      "ssm5": {
+        "real1l": 101,
+        "real125": 55,
+        "real200": 65,
+        "realPet": 81,
+        "activ1l": 47,
+        "realActivCwApet": 28,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 38,
+        "koolerzPet": 34,
+        "hajmola": 50
+      },
+      "ssm6": {
+        "real1l": 93,
+        "real125": 44,
+        "real200": 56,
+        "realPet": 59,
+        "activ1l": 37,
+        "realActivCwApet": 26,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 34,
+        "koolerzPet": 28,
+        "hajmola": 39
+      },
+      "ssm7": {
+        "real1l": 86,
+        "real125": 46,
+        "real200": 59,
+        "realPet": 68,
+        "activ1l": 48,
+        "realActivCwApet": 27,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 39,
+        "koolerzPet": 33,
+        "hajmola": 40
+      },
+      "ssm8": {
+        "real1l": 80,
+        "real125": 34,
+        "real200": 49,
+        "realPet": 50,
+        "activ1l": 35,
+        "realActivCwApet": 24,
+        "realActivCwPet": 17,
+        "koolerzDrinks": 31,
+        "koolerzPet": 25,
+        "hajmola": 34
+      }
+    },
+    "2026-04-27": {
+      "ssm1": {
+        "real1l": 102,
+        "real125": 44,
+        "real200": 66,
+        "realPet": 83,
+        "activ1l": 53,
+        "realActivCwApet": 34,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 43,
+        "koolerzPet": 35,
+        "hajmola": 46
+      },
+      "ssm2": {
+        "real1l": 91,
+        "real125": 40,
+        "real200": 59,
+        "realPet": 63,
+        "activ1l": 42,
+        "realActivCwApet": 27,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 35,
+        "koolerzPet": 30,
+        "hajmola": 37
+      },
+      "ssm3": {
+        "real1l": 93,
+        "real125": 42,
+        "real200": 60,
+        "realPet": 70,
+        "activ1l": 44,
+        "realActivCwApet": 34,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 35,
+        "koolerzPet": 29,
+        "hajmola": 34
+      },
+      "ssm4": {
+        "real1l": 81,
+        "real125": 36,
+        "real200": 56,
+        "realPet": 58,
+        "activ1l": 43,
+        "realActivCwApet": 26,
+        "realActivCwPet": 18,
+        "koolerzDrinks": 31,
+        "koolerzPet": 24,
+        "hajmola": 37
+      },
+      "ssm5": {
+        "real1l": 108,
+        "real125": 51,
+        "real200": 67,
+        "realPet": 80,
+        "activ1l": 46,
+        "realActivCwApet": 29,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 37,
+        "koolerzPet": 30,
+        "hajmola": 48
+      },
+      "ssm6": {
+        "real1l": 83,
+        "real125": 45,
+        "real200": 58,
+        "realPet": 60,
+        "activ1l": 40,
+        "realActivCwApet": 27,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 35,
+        "koolerzPet": 29,
+        "hajmola": 39
+      },
+      "ssm7": {
+        "real1l": 99,
+        "real125": 52,
+        "real200": 59,
+        "realPet": 66,
+        "activ1l": 47,
+        "realActivCwApet": 30,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 38,
+        "koolerzPet": 33,
+        "hajmola": 40
+      },
+      "ssm8": {
+        "real1l": 85,
+        "real125": 36,
+        "real200": 47,
+        "realPet": 56,
+        "activ1l": 39,
+        "realActivCwApet": 23,
+        "realActivCwPet": 16,
+        "koolerzDrinks": 33,
+        "koolerzPet": 25,
+        "hajmola": 32
+      }
+    },
+    "2026-04-30": {
+      "ssm1": {
+        "real1l": 105,
+        "real125": 48,
+        "real200": 69,
+        "realPet": 80,
+        "activ1l": 54,
+        "realActivCwApet": 34,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 46,
+        "koolerzPet": 36,
+        "hajmola": 49
+      },
+      "ssm2": {
+        "real1l": 101,
+        "real125": 42,
+        "real200": 63,
+        "realPet": 75,
+        "activ1l": 43,
+        "realActivCwApet": 28,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 37,
+        "koolerzPet": 31,
+        "hajmola": 41
+      },
+      "ssm3": {
+        "real1l": 90,
+        "real125": 49,
+        "real200": 66,
+        "realPet": 66,
+        "activ1l": 52,
+        "realActivCwApet": 32,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 36,
+        "koolerzPet": 31,
+        "hajmola": 33
+      },
+      "ssm4": {
+        "real1l": 92,
+        "real125": 35,
+        "real200": 52,
+        "realPet": 63,
+        "activ1l": 42,
+        "realActivCwApet": 26,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 33,
+        "koolerzPet": 25,
+        "hajmola": 40
+      },
+      "ssm5": {
+        "real1l": 95,
+        "real125": 55,
+        "real200": 66,
+        "realPet": 81,
+        "activ1l": 48,
+        "realActivCwApet": 29,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 42,
+        "koolerzPet": 31,
+        "hajmola": 49
+      },
+      "ssm6": {
+        "real1l": 93,
+        "real125": 43,
+        "real200": 59,
+        "realPet": 64,
+        "activ1l": 40,
+        "realActivCwApet": 26,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 35,
+        "koolerzPet": 29,
+        "hajmola": 41
+      },
+      "ssm7": {
+        "real1l": 92,
+        "real125": 47,
+        "real200": 61,
+        "realPet": 68,
+        "activ1l": 50,
+        "realActivCwApet": 31,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 37,
+        "koolerzPet": 33,
+        "hajmola": 46
+      },
+      "ssm8": {
+        "real1l": 91,
+        "real125": 36,
+        "real200": 50,
+        "realPet": 51,
+        "activ1l": 35,
+        "realActivCwApet": 22,
+        "realActivCwPet": 17,
+        "koolerzDrinks": 29,
+        "koolerzPet": 25,
+        "hajmola": 32
+      }
+    },
+    "2026-05-13": {
+      "ssm1": {
+        "real1l": 120,
+        "real125": 55,
+        "real200": 78,
+        "realPet": 92,
+        "activ1l": 58,
+        "realActivCwApet": 36,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 48,
+        "koolerzPet": 40,
+        "hajmola": 52
+      },
+      "ssm2": {
+        "real1l": 110,
+        "real125": 48,
+        "real200": 68,
+        "realPet": 78,
+        "activ1l": 50,
+        "realActivCwApet": 30,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 42,
+        "koolerzPet": 35,
+        "hajmola": 45
+      },
+      "ssm3": {
+        "real1l": 105,
+        "real125": 52,
+        "real200": 70,
+        "realPet": 80,
+        "activ1l": 55,
+        "realActivCwApet": 38,
+        "realActivCwPet": 32,
+        "koolerzDrinks": 40,
+        "koolerzPet": 36,
+        "hajmola": 40
+      },
+      "ssm4": {
+        "real1l": 98,
+        "real125": 42,
+        "real200": 62,
+        "realPet": 68,
+        "activ1l": 48,
+        "realActivCwApet": 28,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 38,
+        "koolerzPet": 30,
+        "hajmola": 42
+      },
+      "ssm5": {
+        "real1l": 115,
+        "real125": 60,
+        "real200": 75,
+        "realPet": 88,
+        "activ1l": 52,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 45,
+        "koolerzPet": 38,
+        "hajmola": 58
+      },
+      "ssm6": {
+        "real1l": 102,
+        "real125": 50,
+        "real200": 66,
+        "realPet": 72,
+        "activ1l": 45,
+        "realActivCwApet": 30,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 40,
+        "koolerzPet": 32,
+        "hajmola": 48
+      },
+      "ssm7": {
+        "real1l": 108,
+        "real125": 56,
+        "real200": 72,
+        "realPet": 82,
+        "activ1l": 56,
+        "realActivCwApet": 34,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 44,
+        "koolerzPet": 37,
+        "hajmola": 50
+      },
+      "ssm8": {
+        "real1l": 95,
+        "real125": 40,
+        "real200": 58,
+        "realPet": 62,
+        "activ1l": 42,
+        "realActivCwApet": 26,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 35,
+        "koolerzPet": 28,
+        "hajmola": 38
+      }
+    },
+    "2026-05-14": {
+      "ssm1": {
+        "real1l": 122,
+        "real125": 58,
+        "real200": 80,
+        "realPet": 95,
+        "activ1l": 60,
+        "realActivCwApet": 38,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 50,
+        "koolerzPet": 42,
+        "hajmola": 54
+      },
+      "ssm2": {
+        "real1l": 112,
+        "real125": 50,
+        "real200": 70,
+        "realPet": 80,
+        "activ1l": 52,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 44,
+        "koolerzPet": 36,
+        "hajmola": 46
+      },
+      "ssm3": {
+        "real1l": 107,
+        "real125": 54,
+        "real200": 72,
+        "realPet": 83,
+        "activ1l": 56,
+        "realActivCwApet": 40,
+        "realActivCwPet": 34,
+        "koolerzDrinks": 42,
+        "koolerzPet": 38,
+        "hajmola": 42
+      },
+      "ssm4": {
+        "real1l": 100,
+        "real125": 44,
+        "real200": 64,
+        "realPet": 70,
+        "activ1l": 50,
+        "realActivCwApet": 30,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 40,
+        "koolerzPet": 32,
+        "hajmola": 44
+      },
+      "ssm5": {
+        "real1l": 118,
+        "real125": 62,
+        "real200": 78,
+        "realPet": 92,
+        "activ1l": 54,
+        "realActivCwApet": 34,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 48,
+        "koolerzPet": 40,
+        "hajmola": 60
+      },
+      "ssm6": {
+        "real1l": 104,
+        "real125": 52,
+        "real200": 68,
+        "realPet": 74,
+        "activ1l": 47,
+        "realActivCwApet": 32,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 42,
+        "koolerzPet": 34,
+        "hajmola": 50
+      },
+      "ssm7": {
+        "real1l": 110,
+        "real125": 58,
+        "real200": 74,
+        "realPet": 85,
+        "activ1l": 58,
+        "realActivCwApet": 36,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 46,
+        "koolerzPet": 39,
+        "hajmola": 52
+      },
+      "ssm8": {
+        "real1l": 97,
+        "real125": 42,
+        "real200": 60,
+        "realPet": 64,
+        "activ1l": 44,
+        "realActivCwApet": 28,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 36,
+        "koolerzPet": 30,
+        "hajmola": 40
+      }
+    },
+    "2026-05-15": {
+      "ssm1": {
+        "real1l": 125,
+        "real125": 60,
+        "real200": 82,
+        "realPet": 98,
+        "activ1l": 62,
+        "realActivCwApet": 40,
+        "realActivCwPet": 32,
+        "koolerzDrinks": 52,
+        "koolerzPet": 44,
+        "hajmola": 56
+      },
+      "ssm2": {
+        "real1l": 115,
+        "real125": 52,
+        "real200": 72,
+        "realPet": 83,
+        "activ1l": 54,
+        "realActivCwApet": 34,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 46,
+        "koolerzPet": 38,
+        "hajmola": 48
+      },
+      "ssm3": {
+        "real1l": 110,
+        "real125": 56,
+        "real200": 74,
+        "realPet": 86,
+        "activ1l": 58,
+        "realActivCwApet": 42,
+        "realActivCwPet": 36,
+        "koolerzDrinks": 44,
+        "koolerzPet": 40,
+        "hajmola": 44
+      },
+      "ssm4": {
+        "real1l": 102,
+        "real125": 46,
+        "real200": 66,
+        "realPet": 72,
+        "activ1l": 52,
+        "realActivCwApet": 32,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 42,
+        "koolerzPet": 34,
+        "hajmola": 46
+      },
+      "ssm5": {
+        "real1l": 120,
+        "real125": 64,
+        "real200": 80,
+        "realPet": 95,
+        "activ1l": 56,
+        "realActivCwApet": 36,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 50,
+        "koolerzPet": 42,
+        "hajmola": 62
+      },
+      "ssm6": {
+        "real1l": 106,
+        "real125": 54,
+        "real200": 70,
+        "realPet": 76,
+        "activ1l": 48,
+        "realActivCwApet": 34,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 44,
+        "koolerzPet": 36,
+        "hajmola": 52
+      },
+      "ssm7": {
+        "real1l": 112,
+        "real125": 60,
+        "real200": 76,
+        "realPet": 88,
+        "activ1l": 60,
+        "realActivCwApet": 38,
+        "realActivCwPet": 32,
+        "koolerzDrinks": 48,
+        "koolerzPet": 41,
+        "hajmola": 54
+      },
+      "ssm8": {
+        "real1l": 99,
+        "real125": 44,
+        "real200": 62,
+        "realPet": 66,
+        "activ1l": 46,
+        "realActivCwApet": 30,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 38,
+        "koolerzPet": 32,
+        "hajmola": 42
+      }
+    },
+    "2026-05-16": {
+      "ssm1": {
+        "real1l": 126,
+        "real125": 62,
+        "real200": 84,
+        "realPet": 100,
+        "activ1l": 64,
+        "realActivCwApet": 42,
+        "realActivCwPet": 33,
+        "koolerzDrinks": 54,
+        "koolerzPet": 45,
+        "hajmola": 58
+      },
+      "ssm2": {
+        "real1l": 116,
+        "real125": 54,
+        "real200": 74,
+        "realPet": 85,
+        "activ1l": 56,
+        "realActivCwApet": 35,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 47,
+        "koolerzPet": 39,
+        "hajmola": 50
+      },
+      "ssm3": {
+        "real1l": 112,
+        "real125": 58,
+        "real200": 76,
+        "realPet": 88,
+        "activ1l": 60,
+        "realActivCwApet": 44,
+        "realActivCwPet": 38,
+        "koolerzDrinks": 45,
+        "koolerzPet": 42,
+        "hajmola": 45
+      },
+      "ssm4": {
+        "real1l": 104,
+        "real125": 48,
+        "real200": 68,
+        "realPet": 74,
+        "activ1l": 54,
+        "realActivCwApet": 34,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 44,
+        "koolerzPet": 36,
+        "hajmola": 48
+      },
+      "ssm5": {
+        "real1l": 122,
+        "real125": 66,
+        "real200": 82,
+        "realPet": 98,
+        "activ1l": 58,
+        "realActivCwApet": 37,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 52,
+        "koolerzPet": 43,
+        "hajmola": 63
+      },
+      "ssm6": {
+        "real1l": 108,
+        "real125": 56,
+        "real200": 72,
+        "realPet": 78,
+        "activ1l": 50,
+        "realActivCwApet": 36,
+        "realActivCwPet": 32,
+        "koolerzDrinks": 46,
+        "koolerzPet": 38,
+        "hajmola": 53
+      },
+      "ssm7": {
+        "real1l": 114,
+        "real125": 62,
+        "real200": 78,
+        "realPet": 90,
+        "activ1l": 62,
+        "realActivCwApet": 40,
+        "realActivCwPet": 34,
+        "koolerzDrinks": 50,
+        "koolerzPet": 43,
+        "hajmola": 56
+      },
+      "ssm8": {
+        "real1l": 101,
+        "real125": 46,
+        "real200": 64,
+        "realPet": 68,
+        "activ1l": 48,
+        "realActivCwApet": 32,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 40,
+        "koolerzPet": 34,
+        "hajmola": 44
+      }
+    },
+    "2026-05-17": {
+      "ssm1": {
+        "real1l": 128,
+        "real125": 64,
+        "real200": 86,
+        "realPet": 102,
+        "activ1l": 66,
+        "realActivCwApet": 44,
+        "realActivCwPet": 35,
+        "koolerzDrinks": 56,
+        "koolerzPet": 47,
+        "hajmola": 60
+      },
+      "ssm2": {
+        "real1l": 118,
+        "real125": 56,
+        "real200": 76,
+        "realPet": 87,
+        "activ1l": 58,
+        "realActivCwApet": 37,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 49,
+        "koolerzPet": 40,
+        "hajmola": 52
+      },
+      "ssm3": {
+        "real1l": 114,
+        "real125": 60,
+        "real200": 78,
+        "realPet": 90,
+        "activ1l": 62,
+        "realActivCwApet": 46,
+        "realActivCwPet": 40,
+        "koolerzDrinks": 47,
+        "koolerzPet": 44,
+        "hajmola": 46
+      },
+      "ssm4": {
+        "real1l": 106,
+        "real125": 50,
+        "real200": 70,
+        "realPet": 76,
+        "activ1l": 56,
+        "realActivCwApet": 36,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 46,
+        "koolerzPet": 38,
+        "hajmola": 50
+      },
+      "ssm5": {
+        "real1l": 124,
+        "real125": 68,
+        "real200": 84,
+        "realPet": 100,
+        "activ1l": 60,
+        "realActivCwApet": 39,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 54,
+        "koolerzPet": 45,
+        "hajmola": 65
+      },
+      "ssm6": {
+        "real1l": 110,
+        "real125": 58,
+        "real200": 74,
+        "realPet": 80,
+        "activ1l": 52,
+        "realActivCwApet": 38,
+        "realActivCwPet": 33,
+        "koolerzDrinks": 48,
+        "koolerzPet": 40,
+        "hajmola": 55
+      },
+      "ssm7": {
+        "real1l": 116,
+        "real125": 64,
+        "real200": 80,
+        "realPet": 92,
+        "activ1l": 64,
+        "realActivCwApet": 42,
+        "realActivCwPet": 36,
+        "koolerzDrinks": 52,
+        "koolerzPet": 45,
+        "hajmola": 58
+      },
+      "ssm8": {
+        "real1l": 103,
+        "real125": 48,
+        "real200": 66,
+        "realPet": 70,
+        "activ1l": 50,
+        "realActivCwApet": 34,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 42,
+        "koolerzPet": 35,
+        "hajmola": 46
+      }
+    },
+    "2026-05-18": {
+      "ssm1": {
+        "real1l": 130,
+        "real125": 66,
+        "real200": 88,
+        "realPet": 105,
+        "activ1l": 68,
+        "realActivCwApet": 45,
+        "realActivCwPet": 36,
+        "koolerzDrinks": 57,
+        "koolerzPet": 48,
+        "hajmola": 62
+      },
+      "ssm2": {
+        "real1l": 120,
+        "real125": 58,
+        "real200": 78,
+        "realPet": 89,
+        "activ1l": 60,
+        "realActivCwApet": 38,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 50,
+        "koolerzPet": 41,
+        "hajmola": 54
+      },
+      "ssm3": {
+        "real1l": 116,
+        "real125": 62,
+        "real200": 80,
+        "realPet": 92,
+        "activ1l": 64,
+        "realActivCwApet": 48,
+        "realActivCwPet": 42,
+        "koolerzDrinks": 48,
+        "koolerzPet": 46,
+        "hajmola": 48
+      },
+      "ssm4": {
+        "real1l": 108,
+        "real125": 52,
+        "real200": 72,
+        "realPet": 78,
+        "activ1l": 58,
+        "realActivCwApet": 38,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 48,
+        "koolerzPet": 39,
+        "hajmola": 52
+      },
+      "ssm5": {
+        "real1l": 126,
+        "real125": 70,
+        "real200": 86,
+        "realPet": 102,
+        "activ1l": 62,
+        "realActivCwApet": 40,
+        "realActivCwPet": 31,
+        "koolerzDrinks": 56,
+        "koolerzPet": 47,
+        "hajmola": 68
+      },
+      "ssm6": {
+        "real1l": 112,
+        "real125": 60,
+        "real200": 76,
+        "realPet": 82,
+        "activ1l": 54,
+        "realActivCwApet": 40,
+        "realActivCwPet": 34,
+        "koolerzDrinks": 50,
+        "koolerzPet": 42,
+        "hajmola": 56
+      },
+      "ssm7": {
+        "real1l": 118,
+        "real125": 66,
+        "real200": 82,
+        "realPet": 94,
+        "activ1l": 66,
+        "realActivCwApet": 44,
+        "realActivCwPet": 37,
+        "koolerzDrinks": 54,
+        "koolerzPet": 47,
+        "hajmola": 60
+      },
+      "ssm8": {
+        "real1l": 105,
+        "real125": 50,
+        "real200": 68,
+        "realPet": 72,
+        "activ1l": 52,
+        "realActivCwApet": 35,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 43,
+        "koolerzPet": 36,
+        "hajmola": 48
+      }
+    },
+    "2026-05-19": {
+      "ssm1": {
+        "real1l": 132,
+        "real125": 68,
+        "real200": 90,
+        "realPet": 108,
+        "activ1l": 70,
+        "realActivCwApet": 46,
+        "realActivCwPet": 37,
+        "koolerzDrinks": 58,
+        "koolerzPet": 50,
+        "hajmola": 64
+      },
+      "ssm2": {
+        "real1l": 122,
+        "real125": 60,
+        "real200": 80,
+        "realPet": 91,
+        "activ1l": 62,
+        "realActivCwApet": 40,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 52,
+        "koolerzPet": 42,
+        "hajmola": 56
+      },
+      "ssm3": {
+        "real1l": 118,
+        "real125": 64,
+        "real200": 82,
+        "realPet": 94,
+        "activ1l": 66,
+        "realActivCwApet": 50,
+        "realActivCwPet": 44,
+        "koolerzDrinks": 50,
+        "koolerzPet": 48,
+        "hajmola": 50
+      },
+      "ssm4": {
+        "real1l": 110,
+        "real125": 54,
+        "real200": 74,
+        "realPet": 80,
+        "activ1l": 60,
+        "realActivCwApet": 40,
+        "realActivCwPet": 32,
+        "koolerzDrinks": 50,
+        "koolerzPet": 41,
+        "hajmola": 54
+      },
+      "ssm5": {
+        "real1l": 128,
+        "real125": 72,
+        "real200": 88,
+        "realPet": 104,
+        "activ1l": 64,
+        "realActivCwApet": 42,
+        "realActivCwPet": 33,
+        "koolerzDrinks": 58,
+        "koolerzPet": 49,
+        "hajmola": 70
+      },
+      "ssm6": {
+        "real1l": 114,
+        "real125": 62,
+        "real200": 78,
+        "realPet": 84,
+        "activ1l": 56,
+        "realActivCwApet": 42,
+        "realActivCwPet": 36,
+        "koolerzDrinks": 52,
+        "koolerzPet": 44,
+        "hajmola": 58
+      },
+      "ssm7": {
+        "real1l": 120,
+        "real125": 68,
+        "real200": 84,
+        "realPet": 96,
+        "activ1l": 68,
+        "realActivCwApet": 46,
+        "realActivCwPet": 39,
+        "koolerzDrinks": 56,
+        "koolerzPet": 49,
+        "hajmola": 62
+      },
+      "ssm8": {
+        "real1l": 107,
+        "real125": 52,
+        "real200": 70,
+        "realPet": 74,
+        "activ1l": 54,
+        "realActivCwApet": 36,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 45,
+        "koolerzPet": 37,
+        "hajmola": 50
+      }
+    }
+  }
+}
+</script>
+
+<script>
+/* ============================================================
+   Real ECO Dashboard
+   - Default data is in <script id="default-data">
+   - localStorage overlay key: "ecoDashboardData"
+   - Admin password: SHA-256 hash stored in config.adminPasswordHash
+   - Default admin password: "dabur" (hash baked in)
+   ============================================================ */
+
+const BRAND_COLORS = { Real:'#f97316', Activ:'#16a34a', Koolerz:'#3b82f6', Hajmola:'#8b5cf6' };
+const STORAGE_KEY = 'ecoDashboardData_v1';
+const SESSION_KEY = 'ecoSession_v1';
+
+let DATA = null;
+let currentSSM = null;
+let adminUnlocked = false;
+let charts = {};
+
+/* ---------- Boot ---------- */
+function boot(){
+  const def = JSON.parse(document.getElementById('default-data').textContent);
+  let stored = null;
+  try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch(e){}
+  DATA = stored || def;
+
+  // session
+  const sess = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+  if(sess && sess.ssm){ currentSSM = sess.ssm; }
+
+  // header date
+  document.getElementById('hdrDate').textContent = todayLabel();
+
+  // populate picker
+  const sel = document.getElementById('ssmPicker');
+  sel.innerHTML = '<option value="">— Select your name —</option>' +
+    DATA.ssms.map(s => `<option value="${s.id}" ${currentSSM===s.id?'selected':''}>${s.emoji||''} ${s.name} · ${s.region}</option>`).join('');
+
+  // admin date input default to today
+  document.getElementById('adminDate').value = todayISO();
+
+  // tabs
+  document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+  // auto-enter if session present
+  if(currentSSM){ enterDashboard(); }
+}
+
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function todayLabel(){
+  return new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short',year:'numeric'});
+}
+function fmtDate(iso){
+  return new Date(iso+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+}
+
+function saveData(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+function saveSession(){ localStorage.setItem(SESSION_KEY, JSON.stringify({ssm:currentSSM})); }
+
+/* ---------- SHA-256 ---------- */
+async function sha256(text){
+  const buf = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ---------- Tabs / Navigation ---------- */
+function showTab(tab){
+  document.querySelectorAll('section.view').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-'+tab).classList.add('active');
+  const btn = document.querySelector(`nav.tabs button[data-tab="${tab}"]`);
+  if(btn) btn.classList.add('active');
+  if(tab==='my') renderMy();
+  if(tab==='lb') renderLb();
+  if(tab==='focus') renderFocus();
+  if(tab==='months') renderMonths();
+  if(tab==='badges') renderBadges();
+  if(tab==='admin') { if(adminUnlocked) showAdminPanel(); else { document.getElementById('adminLogin').style.display='block'; document.getElementById('adminPanel').style.display='none'; } }
+}
+
+function enterDashboard(){
+  const sel = document.getElementById('ssmPicker');
+  if(!sel.value){ alert('Pick your name first!'); return; }
+  currentSSM = sel.value;
+  saveSession();
+  refreshHeaderForSSM();
+  document.getElementById('tabs').style.display='flex';
+  showTab('my');
+}
+
+function refreshHeaderForSSM(){
+  const ssm = DATA.ssms.find(s => s.id===currentSSM);
+  if(!ssm) return;
+  // Hide the static "pick" pill, show switcher + sign-out
+  document.getElementById('hdrUser').style.display='none';
+  const sw = document.getElementById('hdrSwitch');
+  sw.style.display='inline-block';
+  sw.innerHTML = DATA.ssms.map(s => `<option value="${s.id}" ${s.id===currentSSM?'selected':''}>${s.emoji||''} ${s.name}</option>`).join('');
+  sw.onchange = () => switchSSM(sw.value);
+  document.getElementById('hdrSignOut').style.display='inline-flex';
+}
+
+function switchSSM(id){
+  currentSSM = id;
+  saveSession();
+  refreshHeaderForSSM();
+  // re-render whichever tab is active
+  const active = document.querySelector('nav.tabs button.active');
+  showTab(active ? active.dataset.tab : 'my');
+  toast('Switched to ' + (DATA.ssms.find(s=>s.id===id)?.name||'SSM'));
+}
+
+function signOut(){
+  currentSSM = null;
+  localStorage.removeItem(SESSION_KEY);
+  // hide tabs + header controls
+  document.getElementById('tabs').style.display='none';
+  document.getElementById('hdrSwitch').style.display='none';
+  document.getElementById('hdrSignOut').style.display='none';
+  const hu = document.getElementById('hdrUser');
+  hu.style.display='inline-block';
+  hu.textContent = 'Pick your name →';
+  // refresh picker select to no selection
+  const sel = document.getElementById('ssmPicker');
+  if(sel){ sel.value = ''; }
+  // show picker view
+  document.querySelectorAll('section.view').forEach(s => s.classList.remove('active'));
+  document.getElementById('view-pick').classList.add('active');
+}
+
+function openAdmin(){
+  document.getElementById('tabs').style.display='flex';
+  showTab('admin');
+}
+
+/* ---------- Core math ---------- */
+function ecoPctForSSM(ssmId, date){
+  const day = DATA.eco[date]; if(!day || !day[ssmId]) return null;
+  const raw = day[ssmId];
+  const base = raw['real1l'];
+  if(!base || base<=0) return null;
+  const out = {};
+  DATA.skus.forEach(sku => {
+    if(sku.isBase){ out[sku.id] = 100; return; }
+    const v = raw[sku.id];
+    out[sku.id] = v==null ? null : (v/base*100);
+  });
+  return out;
+}
+
+function attainmentForSSM(ssmId, date){
+  // overall = avg of min(ECO%/target, 1) across non-base SKUs (with data)
+  const pcts = ecoPctForSSM(ssmId, date);
+  if(!pcts) return null;
+  let sum=0,n=0;
+  DATA.skus.forEach(sku => {
+    if(sku.isBase) return;
+    const p = pcts[sku.id];
+    if(p==null || !sku.target) return;
+    sum += Math.min(p/sku.target, 1);
+    n++;
+  });
+  if(!n) return null;
+  return sum/n*100;
+}
+
+function allDates(){ return Object.keys(DATA.eco).sort(); }
+function latestDate(){ const d = allDates(); return d[d.length-1]; }
+function previousDate(d){ const all = allDates(); const i = all.indexOf(d); return i>0 ? all[i-1] : null; }
+
+function teamAvgAttainment(date){
+  const vals = DATA.ssms.map(s => attainmentForSSM(s.id, date)).filter(v => v!=null);
+  if(!vals.length) return null;
+  return vals.reduce((a,b)=>a+b,0)/vals.length;
+}
+
+function leaderboard(date){
+  return DATA.ssms.map(s => ({
+    ssm:s,
+    attainment: attainmentForSSM(s.id, date) || 0,
+    pcts: ecoPctForSSM(s.id, date) || {}
+  })).sort((a,b)=>b.attainment-a.attainment);
+}
+
+function streakDays(ssmId){
+  // consecutive most-recent days where ssm >= team avg
+  const dates = allDates().slice().reverse();
+  let count = 0;
+  for(const d of dates){
+    const me = attainmentForSSM(ssmId, d);
+    const team = teamAvgAttainment(d);
+    if(me==null || team==null) break;
+    if(me >= team) count++; else break;
+  }
+  return count;
+}
+
+/* ---------- Render: My Scorecard ---------- */
+function renderMy(){
+  const date = latestDate();
+  const ssm = DATA.ssms.find(s => s.id===currentSSM);
+  const pcts = ecoPctForSSM(currentSSM, date);
+  const att = attainmentForSSM(currentSSM, date);
+  const lb = leaderboard(date);
+  const rank = lb.findIndex(x => x.ssm.id===currentSSM)+1;
+  const prevDate = previousDate(date);
+  const prevAtt = prevDate ? attainmentForSSM(currentSSM, prevDate) : null;
+  const prevRank = prevDate ? leaderboard(prevDate).findIndex(x => x.ssm.id===currentSSM)+1 : null;
+
+  // Stats
+  document.getElementById('myScore').textContent = (att||0).toFixed(1)+'%';
+  if(prevAtt!=null){
+    const d = att - prevAtt;
+    const el = document.getElementById('myScoreDelta');
+    el.textContent = (d>=0?'▲ ':'▼ ') + Math.abs(d).toFixed(1) + '% vs yesterday';
+    el.className = 'delta ' + (d>=0?'up':'down');
+  }
+  document.getElementById('myRank').textContent = '#' + rank + (rank===1?' 👑':rank===2?' 🥈':rank===3?' 🥉':'');
+  if(prevRank){
+    const dr = prevRank - rank; // positive = moved up
+    const el = document.getElementById('myRankDelta');
+    if(dr===0){ el.textContent='Same as yesterday'; el.className='delta'; }
+    else { el.textContent = (dr>0?'▲ Up ':'▼ Down ') + Math.abs(dr) + ' from yesterday'; el.className='delta '+(dr>0?'up':'down'); }
+  }
+
+  // On target
+  const onT = DATA.skus.filter(s => !s.isBase && pcts && pcts[s.id]!=null && pcts[s.id] >= s.target).length;
+  const tot = DATA.skus.filter(s => !s.isBase).length;
+  document.getElementById('myOnTarget').textContent = onT + '/' + tot;
+  document.getElementById('myOnTargetSub').textContent = onT===tot ? '🏅 Perfect score!' : `${tot-onT} more to go`;
+
+  // Streak
+  const streak = streakDays(currentSSM);
+  document.getElementById('myStreak').textContent = streak + ' 🔥';
+
+  // SKU bars
+  const list = document.getElementById('mySkuList');
+  list.innerHTML = '';
+  DATA.skus.forEach(sku => {
+    if(sku.isBase) return;
+    const p = pcts ? pcts[sku.id] : null;
+    if(p==null) return;
+    const t = sku.target;
+    const pctOfTarget = p/t;
+    const cls = pctOfTarget >= 1 ? 'green' : (pctOfTarget >= 0.8 ? 'amber' : 'red');
+    const maxScale = Math.max(t*1.3, p*1.1, 100);
+    const fillPct = Math.min(p/maxScale*100, 100);
+    const targetPct = t/maxScale*100;
+    list.insertAdjacentHTML('beforeend', `
+      <div class="sku-row">
+        <div>
+          <div class="sku-name"><span class="brand-dot brand-${sku.brand}"></span>${sku.name}</div>
+          <div class="sku-meta">Target ${t}% · ${sku.brand}</div>
+        </div>
+        <div class="bar-wrap">
+          <div class="bar ${cls}" style="width:${fillPct}%">${p.toFixed(0)}%</div>
+          <div class="target-line" style="left:${targetPct}%" data-label="🎯 ${t}%"></div>
+        </div>
+        <div class="sku-pct ${cls}">${p.toFixed(1)}%</div>
+      </div>
+    `);
+  });
+
+  // Focus SKU
+  const gaps = DATA.skus
+    .filter(s => !s.isBase && pcts && pcts[s.id]!=null && pcts[s.id] < s.target)
+    .map(s => ({sku:s, gap: s.target - pcts[s.id], pct: pcts[s.id]}))
+    .sort((a,b)=>b.gap-a.gap);
+  const focusEl = document.getElementById('myFocus');
+  if(!gaps.length){
+    focusEl.innerHTML = `<div class="empty"><div class="emoji">🎉</div><strong>You're hitting every SKU's target!</strong><div style="font-size:13px;color:var(--muted);margin-top:6px">Keep up the great work — protect your lead.</div></div>`;
+  } else {
+    const top = gaps[0];
+    const teamAvgForSku = DATA.ssms.map(s => ecoPctForSSM(s.id,date)).filter(p=>p&&p[top.sku.id]!=null).map(p=>p[top.sku.id]);
+    const teamAvg = teamAvgForSku.reduce((a,b)=>a+b,0)/teamAvgForSku.length;
+    const topPerformer = leaderboard(date).map(x=>({s:x.ssm,p:x.pcts[top.sku.id]})).filter(x=>x.p!=null).sort((a,b)=>b.p-a.p)[0];
+    focusEl.innerHTML = `
+      <div style="background:linear-gradient(135deg,#fed7aa,#fdba74);border-radius:14px;padding:18px;text-align:center;border:2px dashed var(--orange)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--orange-d)">Today's Focus SKU</div>
+        <div style="font-size:26px;font-weight:900;margin-top:4px">${top.sku.name}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px">${top.sku.brand} · Target ${top.sku.target}%</div>
+        <div style="display:flex;justify-content:center;gap:24px;margin-top:14px">
+          <div><div style="font-size:11px;color:var(--muted)">YOU</div><div style="font-size:22px;font-weight:800;color:var(--red)">${top.pct.toFixed(1)}%</div></div>
+          <div><div style="font-size:11px;color:var(--muted)">TEAM AVG</div><div style="font-size:22px;font-weight:800;color:var(--ink)">${teamAvg.toFixed(1)}%</div></div>
+          <div><div style="font-size:11px;color:var(--muted)">TOP (${topPerformer.s.name.split(' ')[0]})</div><div style="font-size:22px;font-weight:800;color:var(--green-d)">${topPerformer.p.toFixed(1)}%</div></div>
+        </div>
+        <div style="margin-top:12px;font-size:13px;font-weight:600;color:var(--ink)">📈 Close the <strong style="color:var(--red)">${top.gap.toFixed(1)} pt</strong> gap and your overall score jumps ~${(top.gap/(DATA.skus.length-1)/top.sku.target*100).toFixed(1)} pts.</div>
+      </div>
+    `;
+  }
+
+  // Trend chart
+  renderTrend();
+}
+
+function renderTrend(){
+  const ctx = document.getElementById('myTrend');
+  // Last 14 days for the personal trend so the chart isn't cluttered
+  const dates = allDates().slice(-14);
+  const labels = dates.map(d => fmtDate(d));
+  const me = dates.map(d => attainmentForSSM(currentSSM,d));
+  const team = dates.map(d => teamAvgAttainment(d));
+  if(charts.trend) charts.trend.destroy();
+  charts.trend = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[
+      {label:'You', data:me, borderColor:'#ea580c', backgroundColor:'rgba(234,88,12,.15)', fill:true, tension:.35, borderWidth:3, pointRadius:4, pointHoverRadius:7, pointBackgroundColor:'#ea580c'},
+      {label:'Team avg', data:team, borderColor:'#6b7280', borderDash:[6,4], fill:false, tension:.35, borderWidth:2, pointRadius:3, pointHoverRadius:6}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{position:'bottom', labels:{usePointStyle:true, padding:14, font:{size:12, weight:'600'}}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.y||0).toFixed(1)}%`}}
+      },
+      scales:{
+        y:{ beginAtZero:true, max:100, ticks:{callback:v=>v+'%', font:{size:11}}, grid:{color:'rgba(0,0,0,.05)'} },
+        x:{ ticks:{font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:8}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+/* ---------- Render: Leaderboard ---------- */
+function renderLb(){
+  const date = latestDate();
+  const lb = leaderboard(date);
+  const list = document.getElementById('lbList');
+  list.innerHTML = '';
+  lb.forEach((row,i) => {
+    const cls = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const youCls = row.ssm.id===currentSSM ? 'you' : '';
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+    const bars = DATA.skus.filter(s=>!s.isBase).map(s => {
+      const p = row.pcts[s.id]; if(p==null) return '';
+      const r = Math.min(p/s.target,1.2);
+      const h = Math.max(6, r*22);
+      const color = r>=1 ? '#22c55e' : (r>=0.8 ? '#f59e0b' : '#ef4444');
+      return `<span style="height:${h}px;background:${color}" title="${s.name}: ${p.toFixed(1)}%"></span>`;
+    }).join('');
+    list.insertAdjacentHTML('beforeend', `
+      <div class="lb-row ${cls} ${youCls}">
+        <div class="lb-rank">${medal}</div>
+        <div>
+          <div class="lb-name">${row.ssm.emoji||''} ${row.ssm.name} ${row.ssm.id===currentSSM?'<span class="lb-tag">YOU</span>':''}</div>
+          <div class="lb-region">${row.ssm.region}</div>
+        </div>
+        <div class="lb-bars" style="align-items:flex-end;height:24px">${bars}</div>
+        <div style="font-size:11px;color:var(--muted)">Streak<br><strong style="color:var(--ink);font-size:14px">${streakDays(row.ssm.id)} 🔥</strong></div>
+        <div class="lb-score">${row.attainment.toFixed(1)}%</div>
+      </div>
+    `);
+  });
+
+  // Team SKU chart
+  const ctx = document.getElementById('teamSkuChart');
+  const skus = DATA.skus.filter(s => !s.isBase);
+  const avgPcts = skus.map(s => {
+    const ps = DATA.ssms.map(ss => ecoPctForSSM(ss.id,date)).filter(p=>p&&p[s.id]!=null).map(p=>p[s.id]);
+    return ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : 0;
+  });
+  const targets = skus.map(s => s.target);
+  if(charts.teamSku) charts.teamSku.destroy();
+  charts.teamSku = new Chart(ctx, {
+    type:'bar',
+    data:{ labels: skus.map(s=>s.name),
+      datasets:[
+        {label:'Team Avg ECO%', data:avgPcts, backgroundColor: skus.map(s=>BRAND_COLORS[s.brand]), borderRadius:6, barPercentage:.75},
+        {label:'Target', data:targets, type:'scatter', pointStyle:'rectRot', pointRadius:8, pointHoverRadius:10, backgroundColor:'#1f2937', borderColor:'#1f2937'}
+      ]
+    },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'bottom', labels:{usePointStyle:true, padding:14, font:{size:12, weight:'600'}}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.x||0).toFixed(1)}%`}}
+      },
+      scales:{
+        x:{ beginAtZero:true, ticks:{callback:v=>v+'%', font:{size:11}}, grid:{color:'rgba(0,0,0,.05)'}, max:Math.max(...targets, ...avgPcts)*1.15 },
+        y:{ ticks:{font:{size:11, weight:'600'}}, grid:{display:false} }
+      }
+    }
+  });
+
+  // Kings list
+  const kingsEl = document.getElementById('kingsList');
+  kingsEl.innerHTML = skus.map(s => {
+    const winners = DATA.ssms.map(ss => ({s:ss, p: (ecoPctForSSM(ss.id,date)||{})[s.id]})).filter(x=>x.p!=null).sort((a,b)=>b.p-a.p);
+    if(!winners.length) return '';
+    const w = winners[0];
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--border);font-size:13px">
+      <span><span class="brand-dot brand-${s.brand}" style="display:inline-block;width:8px;height:8px;border-radius:999px;margin-right:6px"></span><strong>${s.name}</strong></span>
+      <span>${w.s.emoji||''} ${w.s.name.split(' ')[0]} · <strong style="color:var(--green-d)">${w.p.toFixed(1)}%</strong></span>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- Render: Focus Today ---------- */
+function renderFocus(){
+  const date = latestDate();
+
+  // --- Team Focus SKU: single SKU with the largest team-wide gap to target ---
+  const skuGaps = DATA.skus.filter(s=>!s.isBase).map(s => {
+    const ps = DATA.ssms.map(ss => (ecoPctForSSM(ss.id,date)||{})[s.id]).filter(p=>p!=null);
+    const avg = ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : 0;
+    return {s, avg, gap: s.target - avg, ps};
+  }).sort((a,b)=>b.gap-a.gap);
+  const focusSku = skuGaps[0];
+  // who's lagging this SKU most (3 SSMs)
+  const skuLag = DATA.ssms.map(ss => ({ss, p: (ecoPctForSSM(ss.id,date)||{})[focusSku.s.id]})).filter(x=>x.p!=null).sort((a,b)=>a.p-b.p).slice(0,3);
+  // who's the SKU champion
+  const skuChamp = DATA.ssms.map(ss => ({ss, p: (ecoPctForSSM(ss.id,date)||{})[focusSku.s.id]})).filter(x=>x.p!=null).sort((a,b)=>b.p-a.p)[0];
+  document.getElementById('focusSkuHero').innerHTML = `
+    <div class="label">🎯 Team Focus SKU of the Day</div>
+    <div class="name">${focusSku.s.name}</div>
+    <div class="sub">${focusSku.s.brand} brand · Target ${focusSku.s.target}%</div>
+    <div class="nums">
+      <div class="b"><div class="l">Team Avg</div><div class="v">${focusSku.avg.toFixed(1)}%</div></div>
+      <div class="b"><div class="l">Target</div><div class="v">${focusSku.s.target}%</div></div>
+      <div class="b"><div class="l">Gap</div><div class="v">${focusSku.gap.toFixed(1)} pt</div></div>
+    </div>
+    <div class="who">🏆 SKU Champion: <strong>${skuChamp.ss.emoji||''} ${skuChamp.ss.name}</strong> at ${skuChamp.p.toFixed(1)}%<br>
+    🎯 Coach first: <strong>${skuLag.map(l=>l.ss.name.split(' ')[0]).join(', ')}</strong></div>
+  `;
+
+  // Brand-level avg gap to target
+  const brands = {};
+  DATA.skus.filter(s=>!s.isBase).forEach(s=>{
+    if(!brands[s.brand]) brands[s.brand]={skus:[], gapSum:0, n:0, avgPctSum:0, tgtSum:0};
+    brands[s.brand].skus.push(s);
+  });
+  Object.keys(brands).forEach(bn => {
+    const b = brands[bn];
+    b.skus.forEach(s => {
+      DATA.ssms.forEach(ss => {
+        const p = (ecoPctForSSM(ss.id,date)||{})[s.id];
+        if(p==null) return;
+        b.avgPctSum += p; b.tgtSum += s.target;
+        b.gapSum += (s.target - p); b.n++;
+      });
+    });
+    b.avgPct = b.n ? b.avgPctSum/b.n : 0;
+    b.avgTarget = b.n ? b.tgtSum/b.n : 0;
+    b.avgGap = b.n ? b.gapSum/b.n : 0;
+  });
+  const sorted = Object.entries(brands).sort((a,b)=>b[1].avgGap-a[1].avgGap);
+  const top = sorted[0];
+
+  // SKUs in focus brand sorted by team-wide gap
+  const focusBrandSkus = top[1].skus.map(s => {
+    const ps = DATA.ssms.map(ss=>(ecoPctForSSM(ss.id,date)||{})[s.id]).filter(p=>p!=null);
+    const avg = ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : 0;
+    return {s, avg, gap: s.target-avg};
+  }).sort((a,b)=>b.gap-a.gap);
+
+  document.getElementById('focusHero').innerHTML = `
+    <div class="label">🔥 Focus Brand of the Day</div>
+    <div class="brand-name">${top[0]}</div>
+    <div class="sub">Avg ECO ${top[1].avgPct.toFixed(1)}% vs target ${top[1].avgTarget.toFixed(1)}% · <strong>${top[1].avgGap.toFixed(1)} pt gap</strong></div>
+    <div class="why">💡 Biggest team-wide gap to target — moving this brand moves everyone's score the most.</div>
+    <div class="focus-skus">
+      ${focusBrandSkus.map(x => `
+        <div class="focus-sku">
+          <div class="n">${x.s.name}</div>
+          <div class="g">Target ${x.s.target}%</div>
+          <div class="v">${x.avg.toFixed(1)}% <span style="font-size:12px;opacity:.85">(gap ${x.gap.toFixed(1)})</span></div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // brand chart
+  const ctx = document.getElementById('focusBrandChart');
+  if(charts.focusBrand) charts.focusBrand.destroy();
+  const bNames = sorted.map(x=>x[0]);
+  const bAvg = sorted.map(x=>x[1].avgPct);
+  const bTgt = sorted.map(x=>x[1].avgTarget);
+  charts.focusBrand = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:bNames,
+      datasets:[
+        {label:'Team Avg ECO%', data:bAvg, backgroundColor: bNames.map(n=>BRAND_COLORS[n]), borderRadius:8, barPercentage:.55},
+        {label:'Avg Target', data:bTgt, type:'scatter', pointStyle:'rectRot', pointRadius:10, pointHoverRadius:12, backgroundColor:'#1f2937', borderColor:'#1f2937'}
+      ]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'bottom', labels:{usePointStyle:true, padding:14, font:{size:12, weight:'600'}}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.y||0).toFixed(1)}%`}}
+      },
+      scales:{
+        y:{ beginAtZero:true, ticks:{callback:v=>v+'%', font:{size:11}}, grid:{color:'rgba(0,0,0,.05)'} },
+        x:{ ticks:{font:{size:13, weight:'700'}}, grid:{display:false} }
+      }
+    }
+  });
+
+  // Playbook
+  const pb = document.getElementById('playbook');
+  const tips = [];
+  const focusSkuName = focusBrandSkus[0].s.name;
+  tips.push(`Run a <strong>${top[0]} push day</strong> — focus all SSMs on the brand with the largest team gap.`);
+  tips.push(`Within ${top[0]}, prioritize <strong>${focusSkuName}</strong> (avg gap ${focusBrandSkus[0].gap.toFixed(1)} pts).`);
+  // SSMs lagging this brand most
+  const laggers = DATA.ssms.map(ss => {
+    const ps = top[1].skus.map(s => ({t:s.target, p: (ecoPctForSSM(ss.id,date)||{})[s.id]})).filter(x=>x.p!=null);
+    const gap = ps.reduce((a,b)=>a+(b.t-b.p),0)/(ps.length||1);
+    return {ss, gap};
+  }).sort((a,b)=>b.gap-a.gap).slice(0,3);
+  tips.push(`Coach these SSMs first on ${top[0]}: <strong>${laggers.map(l=>l.ss.name.split(' ')[0]).join(', ')}</strong>.`);
+  // Champion
+  const champion = DATA.ssms.map(ss => {
+    const ps = top[1].skus.map(s => (ecoPctForSSM(ss.id,date)||{})[s.id]).filter(p=>p!=null);
+    const avg = ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : 0;
+    return {ss, avg};
+  }).sort((a,b)=>b.avg-a.avg)[0];
+  tips.push(`Spotlight 🏆 <strong>${champion.ss.name}</strong> as today's ${top[0]} champion — ask them to share what worked.`);
+  pb.innerHTML = tips.map(t => `<li>${t}</li>`).join('');
+}
+
+/* ---------- Monthly aggregations ---------- */
+function ymKey(d){ return d.slice(0,7); }
+function monthLabel(ym){
+  const [y,m] = ym.split('-').map(Number);
+  return new Date(y, m-1, 1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+}
+function availableMonths(){
+  const set = new Set(allDates().map(ymKey));
+  return Array.from(set).sort();
+}
+function datesInMonth(ym){
+  return allDates().filter(d => d.startsWith(ym));
+}
+function monthlyAttainmentForSSM(ssmId, ym){
+  const ds = datesInMonth(ym);
+  const vals = ds.map(d => attainmentForSSM(ssmId, d)).filter(v=>v!=null);
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+function monthlyTeamAvg(ym){
+  const ds = datesInMonth(ym);
+  const vals = ds.map(d => teamAvgAttainment(d)).filter(v=>v!=null);
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+function monthlySkuAvgForSSM(ssmId, skuId, ym){
+  const ds = datesInMonth(ym);
+  const vals = ds.map(d => (ecoPctForSSM(ssmId,d)||{})[skuId]).filter(v=>v!=null);
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+function monthlySkuAvgForTeam(skuId, ym){
+  const ds = datesInMonth(ym);
+  const all=[];
+  ds.forEach(d => DATA.ssms.forEach(s=>{
+    const p = (ecoPctForSSM(s.id,d)||{})[skuId];
+    if(p!=null) all.push(p);
+  }));
+  return all.length ? all.reduce((a,b)=>a+b,0)/all.length : null;
+}
+
+/* ---------- Render: Monthly ---------- */
+let _monthInitDone = false;
+function renderMonths(){
+  // Init pickers once
+  const monthPicker = document.getElementById('monthPicker');
+  const monthCompare = document.getElementById('monthCompare');
+  const ssmPicker = document.getElementById('monthSsmPicker');
+  if(!_monthInitDone){
+    const months = availableMonths();
+    monthPicker.innerHTML = months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join('');
+    monthCompare.innerHTML = '<option value="">— none —</option>' + months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join('');
+    if(months.length>=2){
+      monthPicker.value = months[months.length-1];
+      monthCompare.value = months[months.length-2];
+    } else {
+      monthPicker.value = months[0];
+    }
+    ssmPicker.innerHTML = '<option value="__all__">👥 Whole Team</option>' + DATA.ssms.map(s=>`<option value="${s.id}" ${s.id===currentSSM?'selected':''}>${s.emoji||''} ${s.name}</option>`).join('');
+    [monthPicker, monthCompare, ssmPicker].forEach(el => el.addEventListener('change', drawMonthly));
+    _monthInitDone = true;
+  }
+  drawMonthly();
+}
+
+function drawMonthly(){
+  const ym = document.getElementById('monthPicker').value;
+  const cmp = document.getElementById('monthCompare').value;
+  const ssmId = document.getElementById('monthSsmPicker').value;
+  const isTeam = ssmId === '__all__';
+
+  // Headline metric: avg attainment over month
+  const myMonth = isTeam ? monthlyTeamAvg(ym) : monthlyAttainmentForSSM(ssmId, ym);
+  const cmpMonth = cmp ? (isTeam ? monthlyTeamAvg(cmp) : monthlyAttainmentForSSM(ssmId, cmp)) : null;
+  document.getElementById('mScore').textContent = myMonth!=null ? myMonth.toFixed(1)+'%' : '—';
+  document.getElementById('mScoreDelta').textContent = isTeam ? 'Team avg across all SSMs' : (DATA.ssms.find(s=>s.id===ssmId)?.name || '');
+
+  if(cmpMonth!=null && myMonth!=null){
+    const d = myMonth - cmpMonth;
+    const el = document.getElementById('mDelta');
+    el.innerHTML = (d>=0?'▲ +':'▼ ') + d.toFixed(1) + ' pt';
+    el.style.color = d>=0?'var(--green-d)':'var(--red)';
+    document.getElementById('mDeltaSub').textContent = `${monthLabel(ym)} vs ${monthLabel(cmp)}`;
+  } else {
+    document.getElementById('mDelta').textContent = '—';
+    document.getElementById('mDeltaSub').textContent = 'Pick a comparison month';
+  }
+
+  // Best day in selected month
+  const ds = datesInMonth(ym);
+  let bestDay=null, bestVal=-1;
+  ds.forEach(d => {
+    const v = isTeam ? teamAvgAttainment(d) : attainmentForSSM(ssmId, d);
+    if(v!=null && v>bestVal){ bestVal=v; bestDay=d; }
+  });
+  document.getElementById('mBestDay').textContent = bestDay ? fmtDate(bestDay) : '—';
+  document.getElementById('mBestDaySub').textContent = bestDay ? bestVal.toFixed(1)+'% attainment' : '';
+
+  // Most improved SKU (this month vs cmp)
+  let topSku=null, topImp=-Infinity;
+  DATA.skus.filter(s=>!s.isBase).forEach(s => {
+    const a = isTeam ? monthlySkuAvgForTeam(s.id, ym) : monthlySkuAvgForSSM(ssmId, s.id, ym);
+    const b = cmp ? (isTeam ? monthlySkuAvgForTeam(s.id, cmp) : monthlySkuAvgForSSM(ssmId, s.id, cmp)) : null;
+    if(a==null || b==null) return;
+    const diff = a-b;
+    if(diff > topImp){ topImp=diff; topSku=s; }
+  });
+  if(topSku && topImp>-Infinity){
+    document.getElementById('mTopSku').textContent = topSku.name;
+    const sign = topImp>=0?'▲ +':'▼ ';
+    document.getElementById('mTopSkuSub').textContent = sign + topImp.toFixed(1) + ' pts';
+    document.getElementById('mTopSkuSub').style.color = topImp>=0?'var(--green-d)':'var(--red)';
+  } else {
+    document.getElementById('mTopSku').textContent = '—';
+    document.getElementById('mTopSkuSub').textContent = cmp ? 'Need comparison data' : 'Pick comparison month';
+  }
+
+  // Trend chart: daily attainment over selected month for chosen SSM/team + team avg overlay
+  const ctxT = document.getElementById('monthTrend');
+  if(charts.monthTrend) charts.monthTrend.destroy();
+  const labels = ds.map(d => fmtDate(d));
+  const dataLine = ds.map(d => isTeam ? teamAvgAttainment(d) : attainmentForSSM(ssmId, d));
+  const teamLine = ds.map(d => teamAvgAttainment(d));
+  charts.monthTrend = new Chart(ctxT, {
+    type:'line',
+    data:{ labels, datasets:[
+      {label: isTeam ? 'Team Avg' : (DATA.ssms.find(s=>s.id===ssmId)?.name || 'You'), data:dataLine, borderColor:'#ea580c', backgroundColor:'rgba(234,88,12,.15)', fill:true, tension:.35, borderWidth:3, pointRadius:4, pointHoverRadius:7, pointBackgroundColor:'#ea580c'},
+      ...(isTeam ? [] : [{label:'Team Avg', data:teamLine, borderColor:'#6b7280', borderDash:[6,4], fill:false, tension:.35, borderWidth:2, pointRadius:3}])
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{legend:{position:'bottom', labels:{usePointStyle:true, padding:14, font:{size:12, weight:'600'}}},
+               tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.y||0).toFixed(1)}%`}}},
+      scales:{ y:{beginAtZero:true, max:100, ticks:{callback:v=>v+'%', font:{size:11}}, grid:{color:'rgba(0,0,0,.05)'}},
+               x:{ticks:{font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:10}, grid:{display:false}} }
+    }
+  });
+
+  // SKU compare chart (horizontal bar, this month vs cmp month)
+  const ctxC = document.getElementById('monthSkuCompare');
+  if(charts.monthSku) charts.monthSku.destroy();
+  const skus = DATA.skus.filter(s=>!s.isBase);
+  const aVals = skus.map(s => isTeam ? monthlySkuAvgForTeam(s.id, ym) : monthlySkuAvgForSSM(ssmId, s.id, ym));
+  const bVals = cmp ? skus.map(s => isTeam ? monthlySkuAvgForTeam(s.id, cmp) : monthlySkuAvgForSSM(ssmId, s.id, cmp)) : skus.map(()=>null);
+  charts.monthSku = new Chart(ctxC, {
+    type:'bar',
+    data:{ labels: skus.map(s=>s.name),
+      datasets:[
+        {label: monthLabel(ym), data:aVals, backgroundColor: skus.map(s=>BRAND_COLORS[s.brand]), borderRadius:6, barPercentage:.85},
+        ...(cmp ? [{label: monthLabel(cmp), data:bVals, backgroundColor: skus.map(s=>BRAND_COLORS[s.brand]+'66'), borderRadius:6, barPercentage:.85}] : []),
+        {label:'Target', data:skus.map(s=>s.target), type:'scatter', pointStyle:'rectRot', pointRadius:8, pointHoverRadius:10, backgroundColor:'#1f2937', borderColor:'#1f2937'}
+      ]
+    },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{usePointStyle:true, padding:14, font:{size:12, weight:'600'}}},
+               tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.x||0).toFixed(1)}%`}}},
+      scales:{ x:{beginAtZero:true, ticks:{callback:v=>v+'%', font:{size:11}}, grid:{color:'rgba(0,0,0,.05)'}},
+               y:{ticks:{font:{size:11, weight:'600'}}, grid:{display:false}} }
+    }
+  });
+
+  // Monthly leaderboard
+  const lb = DATA.ssms.map(s => ({s, att: monthlyAttainmentForSSM(s.id, ym) || 0}))
+    .sort((a,b)=>b.att-a.att);
+  const cmpMap = {};
+  if(cmp){
+    DATA.ssms.forEach(s => { cmpMap[s.id] = monthlyAttainmentForSSM(s.id, cmp); });
+  }
+  document.getElementById('monthLeaderboard').innerHTML = lb.map((r,i) => {
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`;
+    const cls = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const youCls = r.s.id===currentSSM ? 'you' : '';
+    let deltaHtml = '';
+    if(cmp && cmpMap[r.s.id]!=null){
+      const d = r.att - cmpMap[r.s.id];
+      const sign = d>=0?'▲ +':'▼ ';
+      const cl = d>0?'up':d<0?'down':'flat';
+      deltaHtml = `<span class="delta-pill ${cl}">${sign}${Math.abs(d).toFixed(1)} pt</span>`;
+    }
+    return `<div class="lb-row ${cls} ${youCls}" style="grid-template-columns:50px 1.6fr 1fr 80px">
+      <div class="lb-rank">${medal}</div>
+      <div>
+        <div class="lb-name">${r.s.emoji||''} ${r.s.name} ${r.s.id===currentSSM?'<span class="lb-tag">YOU</span>':''}</div>
+        <div class="lb-region">${r.s.region}</div>
+      </div>
+      <div>${deltaHtml}</div>
+      <div class="lb-score">${r.att.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+
+  // Heatmap: rows SSMs × columns SKUs, monthly avg ECO%
+  const cols = DATA.skus.filter(s=>!s.isBase);
+  const grid = document.getElementById('monthHeatmap');
+  const cellWidth = `60px repeat(${cols.length},minmax(70px,1fr))`;
+  let html = `<div class="heatmap" style="grid-template-columns:160px repeat(${cols.length},minmax(80px,1fr))">`;
+  html += `<div class="hm-head" style="text-align:left">SSM</div>` + cols.map(c=>`<div class="hm-head" title="${c.name}">${c.name.replace('Real Activ Coconut Water','RACW').replace('Real Drinks ','')}</div>`).join('');
+  DATA.ssms.forEach(ss => {
+    html += `<div class="hm-row-head">${ss.emoji||''} ${ss.name.split(' ')[0]}</div>`;
+    cols.forEach(c => {
+      const v = monthlySkuAvgForSSM(ss.id, c.id, ym);
+      if(v==null){ html += `<div class="hm-cell" style="background:#e5e7eb;color:#9ca3af">—</div>`; return; }
+      const ratio = v / c.target;
+      // Color scale: red <0.7, amber 0.7-1, green >=1, brighter green >=1.2
+      let color = '#ef4444';
+      if(ratio >= 1.15) color = '#15803d';
+      else if(ratio >= 1) color = '#22c55e';
+      else if(ratio >= 0.85) color = '#f59e0b';
+      else if(ratio >= 0.7) color = '#fb923c';
+      html += `<div class="hm-cell" style="background:${color}" title="${ss.name} · ${c.name}: ${v.toFixed(1)}% (target ${c.target}%)">${v.toFixed(0)}%</div>`;
+    });
+  });
+  html += '</div>';
+  grid.innerHTML = html;
+}
+
+/* ---------- Render: Badges & Streaks ---------- */
+function renderBadges(){
+  const date = latestDate();
+  const prev = previousDate(date);
+  const pcts = ecoPctForSSM(currentSSM, date) || {};
+  const prevPcts = prev ? (ecoPctForSSM(currentSSM, prev) || {}) : {};
+  const att = attainmentForSSM(currentSSM, date) || 0;
+  const prevAtt = prev ? (attainmentForSSM(currentSSM, prev) || 0) : 0;
+  const lb = leaderboard(date);
+  const rank = lb.findIndex(x => x.ssm.id===currentSSM)+1;
+  const streak = streakDays(currentSSM);
+
+  // streak ring
+  const ringPct = Math.min(streak/7,1);
+  const dash = 238.76;
+  document.getElementById('streakRing').setAttribute('stroke-dashoffset', dash*(1-ringPct));
+  document.getElementById('streakNum').textContent = streak;
+  document.getElementById('streakText').innerHTML = streak===0 ? 'No streak yet — start today!' : `${streak} day${streak>1?'s':''} in a row 🔥`;
+
+  // dod
+  const dodEl = document.getElementById('dod');
+  if(!prev){ dodEl.innerHTML = '<div class="empty">Need at least 2 days of data.</div>'; }
+  else {
+    const skuChanges = DATA.skus.filter(s=>!s.isBase).map(s=>({
+      s, today:pcts[s.id], yest:prevPcts[s.id],
+      diff: (pcts[s.id]||0) - (prevPcts[s.id]||0)
+    })).filter(x=>x.today!=null&&x.yest!=null).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
+    dodEl.innerHTML = `
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Overall: <strong style="color:${att>=prevAtt?'var(--green-d)':'var(--red)'}">${(att-prevAtt>=0?'+':'')}${(att-prevAtt).toFixed(1)} pts</strong> vs yesterday</div>
+      ${skuChanges.slice(0,5).map(x=>`
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--border);font-size:13px">
+          <span>${x.s.name}</span>
+          <span style="font-weight:700;color:${x.diff>=0?'var(--green-d)':'var(--red)'}">${x.diff>=0?'▲':'▼'} ${Math.abs(x.diff).toFixed(1)} pts</span>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  // Badges
+  const badges = computeBadges(currentSSM, date);
+  document.getElementById('badgeGrid').innerHTML = badges.map(b=>`
+    <div class="badge ${b.earned?'earned':'locked'}">
+      <div class="ico">${b.icon}</div>
+      <div class="nm">${b.name}</div>
+      <div class="ds">${b.desc}</div>
+    </div>
+  `).join('');
+
+  // Confetti for #1
+  if(rank===1){ launchConfetti(); }
+}
+
+function computeBadges(ssmId, date){
+  const ssm = DATA.ssms.find(s=>s.id===ssmId);
+  const pcts = ecoPctForSSM(ssmId, date) || {};
+  const lb = leaderboard(date);
+  const rank = lb.findIndex(x => x.ssm.id===ssmId)+1;
+  const streak = streakDays(ssmId);
+  const skus = DATA.skus.filter(s=>!s.isBase);
+  const onT = skus.filter(s => pcts[s.id]!=null && pcts[s.id] >= s.target).length;
+  const perfect = onT === skus.length;
+
+  // brand champions: highest avg ECO% across brand SKUs
+  const isBrandChamp = (brand) => {
+    const brandSkus = skus.filter(s=>s.brand===brand);
+    const scores = DATA.ssms.map(ss => {
+      const p = ecoPctForSSM(ss.id,date) || {};
+      const vs = brandSkus.map(s=>p[s.id]).filter(v=>v!=null);
+      return {id:ss.id, avg: vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:0};
+    }).sort((a,b)=>b.avg-a.avg);
+    return scores[0] && scores[0].id===ssmId;
+  };
+
+  // comeback: biggest day-over-day attainment jump in team
+  const prev = previousDate(date);
+  let comeback = false;
+  if(prev){
+    const jumps = DATA.ssms.map(ss => {
+      const a = attainmentForSSM(ss.id,date), b = attainmentForSSM(ss.id,prev);
+      return {id:ss.id, jump:(a||0)-(b||0)};
+    }).sort((a,b)=>b.jump-a.jump);
+    comeback = jumps[0] && jumps[0].id===ssmId && jumps[0].jump > 0;
+  }
+
+  return [
+    {icon:'👑', name:'Top of the Hill', desc:'Rank #1 today', earned: rank===1},
+    {icon:'💯', name:'Perfect Score', desc:'All SKUs ≥ target', earned: perfect},
+    {icon:'🔥', name:'Hot Streak', desc:'7+ days above team avg', earned: streak>=7},
+    {icon:'🍊', name:'Juice Boss', desc:'Highest avg Real brand ECO', earned: isBrandChamp('Real')},
+    {icon:'🥥', name:'Coconut King', desc:'Highest avg Activ brand ECO', earned: isBrandChamp('Activ')},
+    {icon:'🧊', name:'Cool Captain', desc:'Highest avg Koolerz brand ECO', earned: isBrandChamp('Koolerz')},
+    {icon:'🌶️', name:'Hajmola Hero', desc:'Highest Hajmola ECO', earned: isBrandChamp('Hajmola')},
+    {icon:'🚀', name:'Comeback Kid', desc:"Biggest 1-day jump in team", earned: comeback}
+  ];
+}
+
+function launchConfetti(){
+  for(let i=0;i<40;i++){
+    const c = document.createElement('div');
+    c.className='confetti';
+    c.style.left = Math.random()*100+'vw';
+    c.style.background = ['#f97316','#16a34a','#3b82f6','#f59e0b','#ec4899','#8b5cf6'][i%6];
+    c.style.animationDuration = (2+Math.random()*2)+'s';
+    c.style.animationDelay = (Math.random()*1.5)+'s';
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(), 6000);
+  }
+}
+
+/* ---------- Admin ---------- */
+async function adminLogin(){
+  const pwd = document.getElementById('adminPwd').value;
+  const hash = await sha256(pwd);
+  if(hash === DATA.config.adminPasswordHash){
+    adminUnlocked = true;
+    showAdminPanel();
+    toast('Welcome, admin 🔓');
+  } else {
+    toast('Wrong password ❌');
+    document.getElementById('adminPwd').value = '';
+  }
+}
+function adminLogout(){
+  adminUnlocked = false;
+  document.getElementById('adminLogin').style.display='block';
+  document.getElementById('adminPanel').style.display='none';
+  document.getElementById('adminPwd').value='';
+}
+function showAdminPanel(){
+  document.getElementById('adminLogin').style.display='none';
+  document.getElementById('adminPanel').style.display='block';
+  buildEcoTable();
+  buildSSMEditor();
+  buildSKUEditor();
+}
+
+function buildEcoTable(){
+  const date = document.getElementById('adminDate').value || latestDate();
+  document.getElementById('adminDate').value = date;
+  const tbl = document.getElementById('ecoTable');
+  let head = '<tr><th class="ssm-col">SSM</th>' + DATA.skus.map(s=>`<th title="${s.name}${s.isBase?' (BASE)':''}">${s.name.replace('Real Activ Coconut Water','RACW')}${s.isBase?' ⭐':''}</th>`).join('') + '</tr>';
+  let body = '';
+  DATA.ssms.forEach(ssm => {
+    const row = (DATA.eco[date] && DATA.eco[date][ssm.id]) || {};
+    body += `<tr><td class="ssm-col">${ssm.emoji||''} ${ssm.name}</td>` +
+      DATA.skus.map(sku => `<td class="${sku.isBase?'base':''}"><input type="number" min="0" step="1" data-ssm="${ssm.id}" data-sku="${sku.id}" value="${row[sku.id]??''}"/></td>`).join('') + '</tr>';
+  });
+  tbl.innerHTML = head + body;
+}
+
+function saveDay(){
+  const date = document.getElementById('adminDate').value;
+  if(!date){ toast('Pick a date first ⚠️'); return; }
+  if(!DATA.eco[date]) DATA.eco[date] = {};
+  document.querySelectorAll('#ecoTable input').forEach(inp => {
+    const ssm = inp.dataset.ssm, sku = inp.dataset.sku;
+    const v = inp.value === '' ? null : Number(inp.value);
+    if(!DATA.eco[date][ssm]) DATA.eco[date][ssm] = {};
+    if(v==null) delete DATA.eco[date][ssm][sku];
+    else DATA.eco[date][ssm][sku] = v;
+  });
+  DATA.config.lastUpdated = date;
+  saveData();
+  toast('Saved ✅ ' + date);
+}
+
+function copyFromPrevious(){
+  const date = document.getElementById('adminDate').value;
+  const prev = previousDate(date);
+  if(!prev){ toast('No previous day to copy from ⚠️'); return; }
+  DATA.eco[date] = JSON.parse(JSON.stringify(DATA.eco[prev]));
+  buildEcoTable();
+  toast(`Copied from ${prev} 📋`);
+}
+
+function clearDay(){
+  const date = document.getElementById('adminDate').value;
+  if(!date) return;
+  if(confirm(`Clear all data for ${date}?`)){
+    delete DATA.eco[date];
+    buildEcoTable();
+    saveData();
+    toast('Cleared 🧹');
+  }
+}
+
+function buildSSMEditor(){
+  const el = document.getElementById('ssmEditor');
+  el.innerHTML = DATA.ssms.map((s,i)=>`
+    <div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:6px">
+      <input style="width:50px;text-align:center" value="${s.emoji||''}" onchange="DATA.ssms[${i}].emoji=this.value;saveData()" placeholder="🦁"/>
+      <input value="${s.name}" onchange="DATA.ssms[${i}].name=this.value;saveData()"/>
+      <input value="${s.region}" onchange="DATA.ssms[${i}].region=this.value;saveData()"/>
+      <button class="btn danger" style="padding:6px 10px" onclick="removeSSM(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function addSSM(){
+  const id = 'ssm' + (Date.now().toString(36));
+  DATA.ssms.push({id, name:'New SSM', region:'Region', emoji:'⭐'});
+  saveData(); buildSSMEditor(); buildEcoTable();
+}
+function removeSSM(i){
+  if(!confirm('Remove '+DATA.ssms[i].name+'?')) return;
+  const id = DATA.ssms[i].id;
+  DATA.ssms.splice(i,1);
+  Object.keys(DATA.eco).forEach(d => { delete DATA.eco[d][id]; });
+  saveData(); buildSSMEditor(); buildEcoTable();
+}
+
+function buildSKUEditor(){
+  const el = document.getElementById('skuEditor');
+  el.innerHTML = DATA.skus.map((s,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 100px 90px;gap:6px;align-items:center;margin-bottom:6px">
+      <div style="font-size:13px"><span class="brand-dot brand-${s.brand}" style="display:inline-block;width:8px;height:8px;border-radius:999px;margin-right:6px"></span>${s.name}${s.isBase?' <strong style="color:var(--orange-d)">(BASE)</strong>':''}</div>
+      <select onchange="DATA.skus[${i}].brand=this.value;saveData();buildSKUEditor()" ${s.isBase?'disabled':''}>
+        ${['Real','Activ','Koolerz','Hajmola'].map(b=>`<option ${b===s.brand?'selected':''}>${b}</option>`).join('')}
+      </select>
+      <input type="number" value="${s.target}" min="0" max="200" onchange="DATA.skus[${i}].target=Number(this.value);saveData()" ${s.isBase?'disabled':''}/>
+    </div>
+  `).join('');
+}
+
+async function changePwd(){
+  const a = document.getElementById('newPwd1').value;
+  const b = document.getElementById('newPwd2').value;
+  if(!a || a!==b){ toast('Passwords don\'t match ⚠️'); return; }
+  DATA.config.adminPasswordHash = await sha256(a);
+  saveData();
+  document.getElementById('newPwd1').value=''; document.getElementById('newPwd2').value='';
+  toast('Password updated 🔑');
+}
+
+function downloadCSVTemplate(){
+  const skuIds = DATA.skus.map(s => s.id);
+  const header = ['date','ssm_id','ssm_name', ...skuIds];
+  const lines = [header.join(',')];
+  // Seed with 1 example row per SSM for today's date — admin can edit/duplicate per day
+  const today = todayISO();
+  DATA.ssms.forEach(s => {
+    const row = [today, s.id, s.name, ...skuIds.map(()=>'')];
+    lines.push(row.join(','));
+  });
+  // Header comment-style helper line removed — pure CSV
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `eco-upload-template.csv`; a.click();
+  URL.revokeObjectURL(url);
+  toast('Template downloaded ⬇️');
+}
+
+function parseCSVLine(line){
+  // Handles simple CSV with optional quoted values
+  const out = [];
+  let cur = '';
+  let inQ = false;
+  for(let i=0;i<line.length;i++){
+    const c = line[i];
+    if(c === '"'){
+      if(inQ && line[i+1] === '"'){ cur += '"'; i++; }
+      else { inQ = !inQ; }
+    } else if(c === ',' && !inQ){
+      out.push(cur); cur='';
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+}
+
+function uploadCSV(file){
+  if(!file){ return; }
+  const log = document.getElementById('csvLog');
+  log.innerHTML = 'Reading…';
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const text = reader.result.replace(/^﻿/, ''); // strip BOM
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+      if(lines.length < 2){ throw new Error('CSV must have a header row and at least one data row'); }
+      const header = parseCSVLine(lines[0]).map(c => c.trim().toLowerCase());
+      const dateIdx = header.indexOf('date');
+      const ssmIdIdx = header.indexOf('ssm_id');
+      const ssmNameIdx = header.indexOf('ssm_name');
+      if(dateIdx < 0) throw new Error('Missing required column: date');
+      if(ssmIdIdx < 0 && ssmNameIdx < 0) throw new Error('Need ssm_id or ssm_name column');
+
+      // Map SKU columns by id (case-insensitive)
+      const skuColMap = {};
+      DATA.skus.forEach(sk => {
+        const i = header.indexOf(sk.id.toLowerCase());
+        if(i >= 0) skuColMap[sk.id] = i;
+      });
+      // Also accept full SKU names
+      DATA.skus.forEach(sk => {
+        if(skuColMap[sk.id] != null) return;
+        const i = header.indexOf(sk.name.toLowerCase());
+        if(i >= 0) skuColMap[sk.id] = i;
+      });
+
+      if(Object.keys(skuColMap).length === 0){
+        throw new Error('No matching SKU columns found. Header had: ' + header.join(', '));
+      }
+
+      let added = 0, skipped = 0, unknownSSM = new Set(), badDate = new Set();
+      const datesTouched = new Set();
+      for(let r=1; r<lines.length; r++){
+        const cells = parseCSVLine(lines[r]);
+        const date = (cells[dateIdx]||'').trim();
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ if(date) badDate.add(date); skipped++; continue; }
+        let ssm = null;
+        if(ssmIdIdx>=0 && cells[ssmIdIdx]){
+          ssm = DATA.ssms.find(s => s.id === cells[ssmIdIdx].trim());
+        }
+        if(!ssm && ssmNameIdx>=0 && cells[ssmNameIdx]){
+          const nm = cells[ssmNameIdx].trim().toLowerCase();
+          ssm = DATA.ssms.find(s => s.name.toLowerCase() === nm);
+        }
+        if(!ssm){ unknownSSM.add(cells[ssmIdIdx]||cells[ssmNameIdx]||'?'); skipped++; continue; }
+
+        if(!DATA.eco[date]) DATA.eco[date] = {};
+        if(!DATA.eco[date][ssm.id]) DATA.eco[date][ssm.id] = {};
+        let wrote = 0;
+        Object.entries(skuColMap).forEach(([skuId, idx]) => {
+          const raw = (cells[idx]||'').trim();
+          if(raw === '' || raw === null) return;
+          const n = Number(raw);
+          if(isNaN(n)) return;
+          DATA.eco[date][ssm.id][skuId] = n;
+          wrote++;
+        });
+        if(wrote > 0){ added++; datesTouched.add(date); }
+        else skipped++;
+      }
+
+      // Resort eco by date
+      const sorted = {};
+      Object.keys(DATA.eco).sort().forEach(k => sorted[k] = DATA.eco[k]);
+      DATA.eco = sorted;
+      saveData();
+      buildEcoTable();
+
+      let msg = `✅ Imported ${added} row${added===1?'':'s'} across ${datesTouched.size} date${datesTouched.size===1?'':'s'}.`;
+      if(skipped) msg += ` ⚠️ Skipped ${skipped}.`;
+      if(unknownSSM.size) msg += `<br>Unknown SSM names/ids: <code>${[...unknownSSM].slice(0,5).join(', ')}</code> — add them in "Configure SSMs" first, then re-upload.`;
+      if(badDate.size) msg += `<br>Bad dates: <code>${[...badDate].slice(0,5).join(', ')}</code> — use YYYY-MM-DD.`;
+      log.innerHTML = msg;
+      toast(`Imported ${added} rows ✅`);
+    } catch(e){
+      log.innerHTML = `<span style="color:var(--red)">❌ ${e.message}</span>`;
+      toast('Import failed ❌');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function downloadJSON(){
+  const blob = new Blob([JSON.stringify(DATA,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `eco-data-${todayISO()}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function restoreJSON(input){
+  const f = input.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      DATA = JSON.parse(reader.result);
+      saveData();
+      buildEcoTable(); buildSSMEditor(); buildSKUEditor();
+      toast('Data restored ✅');
+    } catch(e){ toast('Invalid JSON ❌'); }
+  };
+  reader.readAsText(f);
+}
+
+function resetAll(){
+  if(!confirm('Reset ALL data including SSMs, SKUs, and ECO history? This cannot be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+function exportHTML(){
+  // Bake current DATA into a fresh copy of this HTML and download
+  const html = document.documentElement.outerHTML;
+  // Replace the default-data script content
+  const newJSON = JSON.stringify(DATA,null,2);
+  const replaced = html.replace(/(<script id="default-data" type="application\/json">)([\s\S]*?)(<\/script>)/, `$1\n${newJSON}\n$3`);
+  const blob = new Blob(['<!DOCTYPE html>\n'+replaced], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `eco-dashboard-${todayISO()}.html`; a.click();
+  URL.revokeObjectURL(url);
+  toast('HTML exported 📤 Share this file with SSMs');
+}
+
+document.getElementById('adminDate').addEventListener('change', () => buildEcoTable());
+
+function toast(msg){
+  const t = document.createElement('div'); t.className='toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2500);
+}
+
+boot();
+</script>
+</body>
+</html>
