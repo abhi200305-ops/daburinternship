@@ -200,6 +200,142 @@
   .delta-pill.up{background:#dcfce7;color:#15803d}
   .delta-pill.down{background:#fee2e2;color:#b91c1c}
   .delta-pill.flat{background:#f3f4f6;color:#6b7280}
+
+  /* ===== Phone & tablet responsive (≤768px) ===== */
+  @media (max-width:768px){
+    header{padding:12px 14px;gap:10px;flex-wrap:wrap}
+    header .brand{font-size:16px;gap:10px;min-width:0;flex:1}
+    header .brand > div > div:first-child{font-size:15px;line-height:1.2}
+    header .sub{display:none}
+    header .logo{width:36px;height:36px;font-size:18px;border-radius:10px}
+    header .meta{gap:6px;flex-wrap:wrap;justify-content:flex-end}
+    header .pill, header select.pill, header .icon-btn{font-size:11px;padding:4px 9px;line-height:1.3}
+    header select.pill{padding-right:22px;background-position:right 7px center;max-width:160px;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+
+    nav.tabs{padding:8px 8px 0;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    nav.tabs::-webkit-scrollbar{display:none}
+    nav.tabs button{padding:9px 12px;font-size:13px;white-space:nowrap;flex-shrink:0;gap:4px}
+
+    main{padding:14px 12px 60px}
+    .card{padding:14px;border-radius:12px;margin-bottom:14px}
+    .card h2{font-size:16px}
+    .card .desc{font-size:12px;margin-bottom:10px}
+    .row{gap:12px}
+    .row.cols-2, .row.cols-3{grid-template-columns:1fr}
+    .row.cols-4{grid-template-columns:1fr 1fr}
+
+    .stat{padding:14px}
+    .stat .value{font-size:22px}
+    .stat .label{font-size:11px}
+    .stat .delta{font-size:11px}
+    .stat .icon{font-size:20px;top:10px;right:10px}
+
+    /* SKU rows — name above bar, value next to name */
+    .sku-row{grid-template-columns:1fr 70px;grid-template-areas:"name pct" "bar bar";gap:6px 8px;padding:10px 0}
+    .sku-row > div:nth-child(1){grid-area:name}
+    .sku-row > div:nth-child(2){grid-area:bar}
+    .sku-row > div:nth-child(3){grid-area:pct;text-align:right}
+    .sku-name{font-size:13px}
+    .sku-meta{font-size:10px}
+    .bar-wrap{height:22px}
+    .sku-pct{font-size:14px}
+
+    /* Leaderboard — hide bars and streak column on phone */
+    .lb-row{grid-template-columns:38px 1fr 72px !important;gap:8px;padding:10px 12px}
+    .lb-bars, .lb-row > div:nth-child(4){display:none}
+    .lb-rank{font-size:18px}
+    .lb-name{font-size:13px}
+    .lb-region{font-size:10px}
+    .lb-score{font-size:15px}
+    .lb-tag{font-size:9px;padding:1px 6px}
+
+    /* Focus heroes */
+    .focus-hero{padding:18px;border-radius:16px}
+    .focus-hero .brand-name{font-size:26px}
+    .focus-hero .sub{font-size:12px}
+    .focus-hero .why{font-size:12px;padding:8px 12px}
+    .focus-skus{grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+    .focus-sku{padding:10px}
+    .focus-sku .n{font-size:12px}
+    .focus-sku .v{font-size:16px}
+    .focus-sku-hero{padding:18px;border-radius:16px}
+    .focus-sku-hero .name{font-size:22px}
+    .focus-sku-hero .nums{flex-direction:row;gap:6px;margin-top:10px}
+    .focus-sku-hero .nums .b{padding:8px 6px}
+    .focus-sku-hero .nums .b .v{font-size:16px}
+    .focus-sku-hero .nums .b .l{font-size:9px}
+    .focus-sku-hero .who{font-size:12px;padding:8px 10px;margin-top:10px}
+
+    /* Picker / welcome */
+    .picker{margin:30px 4px;padding:24px 18px}
+    .picker h1{font-size:22px}
+    .picker p{font-size:13px}
+    .picker select, .picker input{font-size:15px;padding:12px}
+
+    /* Charts — shorter heights on phone */
+    .chart-box.h-240{height:220px}
+    .chart-box.h-280{height:240px}
+    .chart-box.h-340{height:280px}
+    .chart-box.h-380{height:320px}
+
+    /* Admin toolbar */
+    .admin-toolbar{flex-direction:column;align-items:stretch;gap:8px}
+    .admin-toolbar > *{width:100%}
+    .admin-toolbar input[type=date]{width:100%}
+    .form-grid{grid-template-columns:1fr}
+    table.eco-table th, table.eco-table td{padding:4px 5px;font-size:11px}
+    table.eco-table input{width:48px;font-size:11px;padding:3px}
+
+    /* SSM/SKU editors stack */
+    #ssmEditor > div, #skuEditor > div{grid-template-columns:1fr !important;gap:4px !important}
+
+    /* Badges */
+    .badge-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+    .badge{padding:10px}
+    .badge .ico{font-size:26px}
+    .badge .nm{font-size:11px}
+    .badge .ds{font-size:9px}
+
+    /* Streak */
+    .streak{flex-direction:row;align-items:center;gap:12px}
+    .ring{width:72px;height:72px;flex-shrink:0}
+    .ring svg{width:72px;height:72px}
+    .ring .label .num{font-size:18px}
+
+    /* Heatmap cells smaller */
+    .hm-cell{padding:6px 4px;min-width:50px;font-size:10px}
+    .hm-row-head, .hm-head{padding:6px 4px;font-size:10px;min-width:50px}
+
+    .toast{bottom:14px;right:14px;left:14px;text-align:center;font-size:13px;padding:11px 16px}
+  }
+
+  /* ===== Small phones (≤480px) ===== */
+  @media (max-width:480px){
+    header .brand{gap:8px}
+    header .brand > div > div:first-child{font-size:14px}
+    header .meta{flex-basis:100%;justify-content:flex-start;gap:5px}
+    header .pill, header select.pill, header .icon-btn{font-size:10px;padding:3px 8px}
+    header select.pill{max-width:130px;padding-right:20px}
+
+    .stat .value{font-size:19px}
+    .stat .label{font-size:10px}
+    .stat .icon{font-size:18px}
+
+    .focus-hero .brand-name{font-size:22px}
+    .focus-sku-hero .name{font-size:19px}
+    .focus-sku-hero .nums .b .v{font-size:14px}
+    .focus-sku-hero .nums{flex-wrap:wrap}
+    .focus-sku-hero .nums .b{flex:1 1 30%}
+
+    .picker h1{font-size:20px}
+    main{padding:12px 10px 50px}
+    .card{padding:12px}
+
+    .chart-box.h-240, .chart-box.h-280{height:200px}
+    .chart-box.h-340, .chart-box.h-380{height:260px}
+
+    nav.tabs button{padding:8px 10px;font-size:12px}
+  }
 </style>
 </head>
 <body>
