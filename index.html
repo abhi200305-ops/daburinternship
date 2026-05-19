@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Real ECO Dashboard · Dabur</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<!-- Firebase (compat SDK, loaded lazily — only initialized if firebase.enabled=true) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#fff7ed;
@@ -110,6 +114,8 @@
   .lb-tag{font-size:10px;background:var(--orange);color:#fff;padding:2px 8px;border-radius:999px;font-weight:700;text-align:center}
   /* Focus card */
   .focus-hero{background:linear-gradient(135deg,#fb923c 0%,#ea580c 60%,#c2410c 100%);color:#fff;border-radius:20px;padding:28px;position:relative;overflow:hidden;box-shadow:var(--shadow-lg)}
+  .focus-hero.focus-hero-2{background:linear-gradient(135deg,#a78bfa 0%,#7c3aed 60%,#5b21b6 100%)}
+  .focus-hero .rank-tag{position:absolute;top:14px;right:18px;background:rgba(0,0,0,.25);font-size:11px;font-weight:800;letter-spacing:.08em;padding:4px 12px;border-radius:999px;text-transform:uppercase}
   .focus-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.08)}
   .focus-hero::after{content:'';position:absolute;bottom:-60px;left:-30px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.06)}
   .focus-hero .label{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.9}
@@ -349,6 +355,7 @@
     </div>
   </div>
   <div class="meta">
+    <span class="pill" id="hdrCloud" title="Cloud sync status" style="display:none">☁️ —</span>
     <span class="pill" id="hdrDate"></span>
     <select class="pill" id="hdrSwitch" title="Switch SSM" style="display:none"></select>
     <button class="icon-btn" id="hdrSignOut" title="Sign out / pick a different name" style="display:none" onclick="signOut()">🚪 Sign Out</button>
@@ -459,9 +466,11 @@
 
   <!-- Focus Today -->
   <section class="view" id="view-focus">
+    <div class="focus-sku-hero" id="focusSkuHero"></div>
+    <div style="height:18px"></div>
     <div class="row cols-2">
-      <div class="focus-sku-hero" id="focusSkuHero"></div>
       <div class="focus-hero" id="focusHero"></div>
+      <div class="focus-hero focus-hero-2" id="focusHero2"></div>
     </div>
     <div style="height:18px"></div>
     <div class="row cols-2">
@@ -592,6 +601,42 @@
     </div>
 
     <div id="adminPanel" style="display:none">
+
+      <div class="card" style="border:2px solid #f59e0b;background:linear-gradient(180deg,#fffbeb,#fff)">
+        <h2>📅 Last Month (LM) ECO — Admin Only</h2>
+        <div class="desc">
+          The single source of truth for "Last Month" comparisons, focus brand absolute lag, and the upcoming "billed LM but pending MTD" outlet feature.
+          Enter <strong>raw LM ECO counts</strong> per SSM × SKU. SSMs cannot see or edit this — only you.
+        </div>
+        <div class="admin-toolbar">
+          <label style="font-size:12px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px">
+            Period:
+            <select id="lmPeriod" style="padding:8px 12px;border:2px solid var(--border);border-radius:8px;font-weight:700"></select>
+          </label>
+          <button class="btn green" onclick="saveLm()">💾 Save LM Data</button>
+          <button class="btn ghost" onclick="copyLmFromPrev()">📋 Copy from Prev Period</button>
+          <button class="btn gray" onclick="clearLm()">🧹 Clear Period</button>
+          <span style="flex:1"></span>
+          <button class="btn ghost" onclick="downloadLmTemplate()">⬇️ LM CSV Template</button>
+          <button class="btn" onclick="document.getElementById('lmCsvInput').click()">⬆️ Upload LM CSV</button>
+          <input type="file" id="lmCsvInput" accept=".csv,text/csv" style="display:none" onchange="uploadLmCSV(this.files[0])"/>
+          <button class="btn" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)" onclick="document.getElementById('smCardInput').click()">🪄 Import Salesman Card</button>
+          <input type="file" id="smCardInput" accept=".xls,.html,.htm,.xlsx" multiple style="display:none" onchange="importSalesmanCard(this.files)"/>
+        </div>
+        <div id="lmLog" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
+        <div class="admin-grid">
+          <table class="eco-table" id="lmTable"></table>
+        </div>
+        <details style="margin-top:14px">
+          <summary style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:700">ℹ️ How Salesman Card import works</summary>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6">
+            Upload one or more <code>SalesmanCardReport*.xls</code> files (the HTML-in-xls exports from the portal).
+            The importer reads the <strong>SSM Name + Brand + ECO LM</strong> columns, matches SSM names to your configured SSMs, matches Brand names to your configured SKUs, and fills the LM grid for the selected period.
+            You can review and tweak numbers before hitting <strong>Save LM Data</strong>.
+          </div>
+        </details>
+      </div>
+
       <div class="card">
         <h2>📝 Daily ECO Entry</h2>
         <div class="desc">Type each SSM's raw ECO count per SKU. <strong>Real 1L is the base</strong> (yellow column) — ECO% for every other SKU is computed as <code>SKU ÷ Real 1L × 100</code>.</div>
@@ -644,6 +689,47 @@
         </div>
       </details>
 
+      <details class="adv">
+        <summary>☁️ Cloud Sync (Firebase Firestore) — for GitHub Pages deploy</summary>
+        <div class="body">
+          <p style="font-size:13px;margin:4px 0 10px">Connect to Firebase so the dashboard syncs across every device. Once enabled, you update data here and SSMs see it live on their phones.</p>
+          <ol style="font-size:13px;line-height:1.65;padding-left:20px;margin:0 0 12px;color:var(--ink)">
+            <li>Go to <a href="https://console.firebase.google.com/" target="_blank" rel="noopener" style="color:var(--orange-d);font-weight:700">console.firebase.google.com</a> → <strong>Add Project</strong> → name it (e.g. <code>dabur-eco</code>).</li>
+            <li>Inside the project: <strong>Build → Firestore Database → Create database</strong> (Production mode, region <code>asia-south1</code>).</li>
+            <li><strong>Build → Authentication → Get started → Sign-in method → enable Anonymous</strong>.</li>
+            <li>Project Settings (⚙️) → <strong>Your apps → Web (&lt;/&gt;)</strong> → register → copy the <code>firebaseConfig</code> object → paste it below.</li>
+            <li>In Firestore → <strong>Rules</strong> tab, paste:
+              <pre style="background:#1f2937;color:#fff7ed;padding:10px 12px;border-radius:8px;font-size:11px;overflow-x:auto;margin:6px 0">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{doc=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}</pre>
+            </li>
+            <li>Hit <strong>Enable Cloud Sync</strong> below. Then <strong>Push Local → Cloud</strong> once to seed the DB.</li>
+          </ol>
+          <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">Firebase config (paste the whole object, including braces)</label>
+          <textarea id="fbConfigInput" rows="9" placeholder='{
+  apiKey: "AIza...",
+  authDomain: "dabur-eco.firebaseapp.com",
+  projectId: "dabur-eco",
+  storageBucket: "dabur-eco.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdef"
+}' style="width:100%;padding:10px;border:2px solid var(--border);border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5"></textarea>
+          <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <button class="btn green" onclick="enableCloudSync()">🔌 Enable Cloud Sync</button>
+            <button class="btn ghost" onclick="pushLocalToCloud()">⬆️ Push Local → Cloud</button>
+            <button class="btn ghost" onclick="pullCloudToLocal()">⬇️ Pull Cloud → Local</button>
+            <button class="btn gray" onclick="disableCloudSync()">⏸️ Disable</button>
+            <span id="fbStatus" style="font-size:12px;font-weight:700;margin-left:6px">Not connected</span>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:10px">⚠️ Anyone signed-in anonymously can read AND write data — fine for a trusted internal team. For tighter security later, switch to email auth + custom claims and update Firestore rules to <code>request.auth.token.admin == true</code> for write.</p>
+        </div>
+      </details>
+
       <details class="adv" open>
         <summary>📥 Bulk Upload — Historical / April Data (CSV)</summary>
         <div class="body">
@@ -690,57 +776,109 @@
   "config": {
     "adminPasswordHash": "ef31506c05a8c262c3ee8e6c1328d7140981e8027b86e88d618ac04f970c16b9",
     "companyName": "Dabur",
-    "team": "Real Sales Team",
-    "lastUpdated": "2026-05-19"
+    "team": "Real Sales Team \u2014 Delhi",
+    "lastUpdated": "2026-05-15",
+    "snapshots": {
+      "2026-04-30": "LM (April 2026)",
+      "2026-05-15": "MTD (May 1\u201315, 2026)"
+    }
   },
   "ssms": [
     {
       "id": "ssm1",
-      "name": "Rajesh Kumar",
-      "region": "Delhi NCR",
+      "name": "Ajay Kumar",
+      "region": "Delhi",
       "emoji": "\ud83e\udd81"
     },
     {
       "id": "ssm2",
-      "name": "Priya Sharma",
-      "region": "Mumbai West",
+      "name": "Anil Kumar Sharma",
+      "region": "Delhi",
       "emoji": "\ud83d\udc2f"
     },
     {
       "id": "ssm3",
-      "name": "Arjun Reddy",
-      "region": "Bangalore",
+      "name": "Balmiki Prasad Mishra",
+      "region": "Delhi",
       "emoji": "\ud83e\udd85"
     },
     {
       "id": "ssm4",
-      "name": "Sneha Iyer",
-      "region": "Chennai",
+      "name": "Bijendra Kumar",
+      "region": "Delhi",
       "emoji": "\ud83e\udd8b"
     },
     {
       "id": "ssm5",
-      "name": "Vikram Singh",
-      "region": "Jaipur",
+      "name": "Hans Raj Yadav",
+      "region": "Delhi",
       "emoji": "\ud83d\udc3a"
     },
     {
       "id": "ssm6",
-      "name": "Anjali Verma",
-      "region": "Kolkata",
+      "name": "Harsh Vardhan",
+      "region": "Delhi",
       "emoji": "\ud83e\udd8a"
     },
     {
       "id": "ssm7",
-      "name": "Karan Mehta",
-      "region": "Ahmedabad",
+      "name": "Manish Kumar",
+      "region": "Delhi",
       "emoji": "\ud83d\udc09"
     },
     {
       "id": "ssm8",
-      "name": "Pooja Nair",
-      "region": "Hyderabad",
+      "name": "Mithlesh Kumar Jha",
+      "region": "Delhi",
       "emoji": "\ud83e\udd9a"
+    },
+    {
+      "id": "ssm9",
+      "name": "Nitin Singh",
+      "region": "Delhi",
+      "emoji": "\ud83d\udc05"
+    },
+    {
+      "id": "ssm10",
+      "name": "Prem Prasad",
+      "region": "Delhi",
+      "emoji": "\ud83e\udd8c"
+    },
+    {
+      "id": "ssm11",
+      "name": "Rajesh Kumar",
+      "region": "Delhi",
+      "emoji": "\ud83d\udc03"
+    },
+    {
+      "id": "ssm12",
+      "name": "Salik Ram",
+      "region": "Delhi",
+      "emoji": "\ud83d\udc0e"
+    },
+    {
+      "id": "ssm13",
+      "name": "Santosh Kumar Singh",
+      "region": "Delhi",
+      "emoji": "\ud83e\udd93"
+    },
+    {
+      "id": "ssm14",
+      "name": "Vidyanand Kumar",
+      "region": "Delhi",
+      "emoji": "\ud83e\udd92"
+    },
+    {
+      "id": "ssm15",
+      "name": "Vijay Bahadur Yadav",
+      "region": "Delhi",
+      "emoji": "\ud83d\udc18"
+    },
+    {
+      "id": "ssm16",
+      "name": "Vikram Kumar Singh",
+      "region": "Delhi",
+      "emoji": "\ud83e\udd8f"
     }
   ],
   "skus": [
@@ -748,32 +886,32 @@
       "id": "real1l",
       "name": "Real 1 Ltr",
       "brand": "Real",
-      "isBase": true,
-      "target": 100
+      "target": 100,
+      "isBase": true
     },
     {
       "id": "real125",
       "name": "Real 125ml",
       "brand": "Real",
-      "target": 55
+      "target": 35
     },
     {
       "id": "real200",
       "name": "Real 200ml",
       "brand": "Real",
-      "target": 70
+      "target": 100
     },
     {
       "id": "realPet",
       "name": "Real Pet",
       "brand": "Real",
-      "target": 80
+      "target": 15
     },
     {
       "id": "activ1l",
       "name": "Activ 1 Ltr",
       "brand": "Activ",
-      "target": 55
+      "target": 5
     },
     {
       "id": "realActivCwApet",
@@ -785,1496 +923,2937 @@
       "id": "realActivCwPet",
       "name": "Real Activ Coconut Water Pet",
       "brand": "Activ",
-      "target": 30
+      "target": 40
     },
     {
       "id": "koolerzDrinks",
       "name": "Real Drinks Koolerz",
       "brand": "Koolerz",
-      "target": 45
+      "target": 60
     },
     {
       "id": "koolerzPet",
       "name": "Real Koolerz Pet",
       "brand": "Koolerz",
-      "target": 40
+      "target": 50
     },
     {
       "id": "hajmola",
       "name": "Hajmola Drink",
       "brand": "Hajmola",
-      "target": 50
+      "target": 65
     }
   ],
+  "lm": {},
   "eco": {
     "2026-04-04": {
       "ssm1": {
         "real1l": 94,
-        "real125": 39,
-        "real200": 57,
-        "realPet": 67,
-        "activ1l": 46,
-        "realActivCwApet": 28,
-        "realActivCwPet": 23,
-        "koolerzDrinks": 34,
-        "koolerzPet": 30,
-        "hajmola": 37
+        "real125": 43,
+        "real200": 61,
+        "realPet": 68,
+        "activ1l": 47,
+        "realActivCwApet": 30,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 40,
+        "koolerzPet": 33,
+        "hajmola": 39
       },
       "ssm2": {
-        "real1l": 80,
-        "real125": 37,
-        "real200": 48,
-        "realPet": 57,
-        "activ1l": 39,
-        "realActivCwApet": 23,
-        "realActivCwPet": 18,
-        "koolerzDrinks": 33,
-        "koolerzPet": 28,
-        "hajmola": 32
-      },
-      "ssm3": {
-        "real1l": 84,
-        "real125": 41,
-        "real200": 52,
-        "realPet": 58,
-        "activ1l": 45,
-        "realActivCwApet": 28,
-        "realActivCwPet": 23,
-        "koolerzDrinks": 29,
-        "koolerzPet": 29,
-        "hajmola": 31
-      },
-      "ssm4": {
-        "real1l": 79,
-        "real125": 33,
-        "real200": 48,
-        "realPet": 56,
-        "activ1l": 36,
-        "realActivCwApet": 22,
-        "realActivCwPet": 18,
-        "koolerzDrinks": 30,
-        "koolerzPet": 24,
-        "hajmola": 33
-      },
-      "ssm5": {
-        "real1l": 91,
+        "real1l": 82,
         "real125": 42,
-        "real200": 55,
-        "realPet": 65,
-        "activ1l": 37,
-        "realActivCwApet": 23,
-        "realActivCwPet": 18,
-        "koolerzDrinks": 33,
-        "koolerzPet": 30,
-        "hajmola": 43
-      },
-      "ssm6": {
-        "real1l": 76,
-        "real125": 36,
-        "real200": 49,
-        "realPet": 59,
-        "activ1l": 35,
-        "realActivCwApet": 23,
-        "realActivCwPet": 19,
-        "koolerzDrinks": 32,
-        "koolerzPet": 23,
+        "real200": 54,
+        "realPet": 63,
+        "activ1l": 43,
+        "realActivCwApet": 27,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 39,
+        "koolerzPet": 32,
         "hajmola": 36
       },
-      "ssm7": {
-        "real1l": 89,
-        "real125": 44,
-        "real200": 56,
+      "ssm3": {
+        "real1l": 91,
+        "real125": 45,
+        "real200": 58,
         "realPet": 65,
-        "activ1l": 45,
+        "activ1l": 46,
         "realActivCwApet": 27,
-        "realActivCwPet": 20,
-        "koolerzDrinks": 31,
-        "koolerzPet": 27,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 38,
+        "koolerzPet": 33,
+        "hajmola": 40
+      },
+      "ssm4": {
+        "real1l": 84,
+        "real125": 41,
+        "real200": 55,
+        "realPet": 66,
+        "activ1l": 40,
+        "realActivCwApet": 26,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 37,
+        "koolerzPet": 31,
         "hajmola": 37
       },
+      "ssm5": {
+        "real1l": 92,
+        "real125": 42,
+        "real200": 59,
+        "realPet": 67,
+        "activ1l": 42,
+        "realActivCwApet": 27,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 39,
+        "koolerzPet": 33,
+        "hajmola": 40
+      },
+      "ssm6": {
+        "real1l": 82,
+        "real125": 40,
+        "real200": 55,
+        "realPet": 68,
+        "activ1l": 42,
+        "realActivCwApet": 27,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 39,
+        "koolerzPet": 29,
+        "hajmola": 37
+      },
+      "ssm7": {
+        "real1l": 96,
+        "real125": 46,
+        "real200": 62,
+        "realPet": 71,
+        "activ1l": 47,
+        "realActivCwApet": 30,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 38,
+        "koolerzPet": 32,
+        "hajmola": 40
+      },
       "ssm8": {
-        "real1l": 69,
-        "real125": 33,
-        "real200": 47,
-        "realPet": 46,
-        "activ1l": 33,
-        "realActivCwApet": 20,
-        "realActivCwPet": 16,
-        "koolerzDrinks": 27,
-        "koolerzPet": 21,
-        "hajmola": 28
+        "real1l": 76,
+        "real125": 42,
+        "real200": 56,
+        "realPet": 59,
+        "activ1l": 40,
+        "realActivCwApet": 25,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 36,
+        "koolerzPet": 28,
+        "hajmola": 35
+      },
+      "ssm9": {
+        "real1l": 88,
+        "real125": 42,
+        "real200": 60,
+        "realPet": 71,
+        "activ1l": 43,
+        "realActivCwApet": 27,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 40,
+        "koolerzPet": 30,
+        "hajmola": 37
+      },
+      "ssm10": {
+        "real1l": 83,
+        "real125": 45,
+        "real200": 62,
+        "realPet": 67,
+        "activ1l": 41,
+        "realActivCwApet": 27,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 40,
+        "koolerzPet": 34,
+        "hajmola": 42
+      },
+      "ssm11": {
+        "real1l": 82,
+        "real125": 45,
+        "real200": 61,
+        "realPet": 68,
+        "activ1l": 42,
+        "realActivCwApet": 28,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 39,
+        "koolerzPet": 32,
+        "hajmola": 42
+      },
+      "ssm12": {
+        "real1l": 92,
+        "real125": 42,
+        "real200": 60,
+        "realPet": 65,
+        "activ1l": 46,
+        "realActivCwApet": 29,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 41,
+        "koolerzPet": 32,
+        "hajmola": 38
+      },
+      "ssm13": {
+        "real1l": 91,
+        "real125": 44,
+        "real200": 62,
+        "realPet": 68,
+        "activ1l": 41,
+        "realActivCwApet": 27,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 42,
+        "koolerzPet": 33,
+        "hajmola": 42
+      },
+      "ssm14": {
+        "real1l": 85,
+        "real125": 41,
+        "real200": 63,
+        "realPet": 72,
+        "activ1l": 41,
+        "realActivCwApet": 28,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 41,
+        "koolerzPet": 33,
+        "hajmola": 38
+      },
+      "ssm15": {
+        "real1l": 87,
+        "real125": 44,
+        "real200": 58,
+        "realPet": 71,
+        "activ1l": 43,
+        "realActivCwApet": 27,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 41,
+        "koolerzPet": 31,
+        "hajmola": 39
+      },
+      "ssm16": {
+        "real1l": 93,
+        "real125": 45,
+        "real200": 59,
+        "realPet": 68,
+        "activ1l": 42,
+        "realActivCwApet": 27,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 40,
+        "koolerzPet": 31,
+        "hajmola": 38
       }
     },
     "2026-04-08": {
       "ssm1": {
-        "real1l": 95,
-        "real125": 41,
+        "real1l": 89,
+        "real125": 48,
         "real200": 62,
-        "realPet": 77,
-        "activ1l": 45,
-        "realActivCwApet": 27,
-        "realActivCwPet": 24,
-        "koolerzDrinks": 38,
-        "koolerzPet": 29,
-        "hajmola": 38
+        "realPet": 76,
+        "activ1l": 49,
+        "realActivCwApet": 28,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 44,
+        "koolerzPet": 33,
+        "hajmola": 41
       },
       "ssm2": {
-        "real1l": 81,
-        "real125": 38,
-        "real200": 56,
-        "realPet": 60,
-        "activ1l": 36,
-        "realActivCwApet": 23,
-        "realActivCwPet": 20,
-        "koolerzDrinks": 33,
-        "koolerzPet": 29,
-        "hajmola": 37
+        "real1l": 92,
+        "real125": 44,
+        "real200": 59,
+        "realPet": 70,
+        "activ1l": 45,
+        "realActivCwApet": 27,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 39,
+        "koolerzPet": 31,
+        "hajmola": 39
       },
       "ssm3": {
-        "real1l": 76,
-        "real125": 42,
-        "real200": 56,
-        "realPet": 63,
-        "activ1l": 41,
-        "realActivCwApet": 30,
-        "realActivCwPet": 23,
-        "koolerzDrinks": 31,
-        "koolerzPet": 28,
-        "hajmola": 34
+        "real1l": 92,
+        "real125": 46,
+        "real200": 65,
+        "realPet": 66,
+        "activ1l": 44,
+        "realActivCwApet": 28,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 39,
+        "koolerzPet": 31,
+        "hajmola": 40
       },
       "ssm4": {
-        "real1l": 81,
-        "real125": 32,
-        "real200": 48,
-        "realPet": 50,
-        "activ1l": 40,
-        "realActivCwApet": 23,
-        "realActivCwPet": 17,
-        "koolerzDrinks": 30,
-        "koolerzPet": 24,
-        "hajmola": 31
+        "real1l": 82,
+        "real125": 40,
+        "real200": 54,
+        "realPet": 67,
+        "activ1l": 41,
+        "realActivCwApet": 27,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 35,
+        "koolerzPet": 32,
+        "hajmola": 39
       },
       "ssm5": {
-        "real1l": 94,
-        "real125": 47,
-        "real200": 61,
-        "realPet": 69,
-        "activ1l": 37,
-        "realActivCwApet": 24,
-        "realActivCwPet": 18,
-        "koolerzDrinks": 38,
-        "koolerzPet": 32,
-        "hajmola": 48
+        "real1l": 97,
+        "real125": 48,
+        "real200": 65,
+        "realPet": 67,
+        "activ1l": 46,
+        "realActivCwApet": 28,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 39,
+        "koolerzPet": 33,
+        "hajmola": 44
       },
       "ssm6": {
-        "real1l": 77,
-        "real125": 36,
-        "real200": 55,
-        "realPet": 60,
-        "activ1l": 33,
-        "realActivCwApet": 23,
-        "realActivCwPet": 19,
-        "koolerzDrinks": 33,
-        "koolerzPet": 26,
-        "hajmola": 35
-      },
-      "ssm7": {
-        "real1l": 84,
+        "real1l": 82,
         "real125": 44,
-        "real200": 54,
-        "realPet": 68,
-        "activ1l": 43,
-        "realActivCwApet": 25,
+        "real200": 58,
+        "realPet": 65,
+        "activ1l": 45,
+        "realActivCwApet": 29,
         "realActivCwPet": 22,
-        "koolerzDrinks": 36,
-        "koolerzPet": 28,
+        "koolerzDrinks": 40,
+        "koolerzPet": 30,
         "hajmola": 38
       },
+      "ssm7": {
+        "real1l": 98,
+        "real125": 47,
+        "real200": 63,
+        "realPet": 74,
+        "activ1l": 43,
+        "realActivCwApet": 30,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 44,
+        "koolerzPet": 32,
+        "hajmola": 44
+      },
       "ssm8": {
-        "real1l": 80,
-        "real125": 32,
-        "real200": 45,
-        "realPet": 49,
-        "activ1l": 31,
-        "realActivCwApet": 19,
-        "realActivCwPet": 15,
-        "koolerzDrinks": 28,
-        "koolerzPet": 21,
-        "hajmola": 28
+        "real1l": 76,
+        "real125": 39,
+        "real200": 56,
+        "realPet": 64,
+        "activ1l": 39,
+        "realActivCwApet": 24,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 35,
+        "koolerzPet": 30,
+        "hajmola": 37
+      },
+      "ssm9": {
+        "real1l": 89,
+        "real125": 45,
+        "real200": 61,
+        "realPet": 73,
+        "activ1l": 43,
+        "realActivCwApet": 29,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 40,
+        "koolerzPet": 33,
+        "hajmola": 40
+      },
+      "ssm10": {
+        "real1l": 87,
+        "real125": 46,
+        "real200": 58,
+        "realPet": 69,
+        "activ1l": 48,
+        "realActivCwApet": 30,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 39,
+        "koolerzPet": 32,
+        "hajmola": 43
+      },
+      "ssm11": {
+        "real1l": 94,
+        "real125": 47,
+        "real200": 60,
+        "realPet": 66,
+        "activ1l": 47,
+        "realActivCwApet": 29,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 43,
+        "koolerzPet": 33,
+        "hajmola": 38
+      },
+      "ssm12": {
+        "real1l": 93,
+        "real125": 44,
+        "real200": 62,
+        "realPet": 73,
+        "activ1l": 43,
+        "realActivCwApet": 27,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 41,
+        "koolerzPet": 32,
+        "hajmola": 41
+      },
+      "ssm13": {
+        "real1l": 92,
+        "real125": 43,
+        "real200": 62,
+        "realPet": 67,
+        "activ1l": 45,
+        "realActivCwApet": 30,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 39,
+        "koolerzPet": 32,
+        "hajmola": 40
+      },
+      "ssm14": {
+        "real1l": 84,
+        "real125": 46,
+        "real200": 62,
+        "realPet": 67,
+        "activ1l": 46,
+        "realActivCwApet": 29,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 38,
+        "koolerzPet": 31,
+        "hajmola": 43
+      },
+      "ssm15": {
+        "real1l": 94,
+        "real125": 45,
+        "real200": 64,
+        "realPet": 70,
+        "activ1l": 43,
+        "realActivCwApet": 27,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 43,
+        "koolerzPet": 34,
+        "hajmola": 43
+      },
+      "ssm16": {
+        "real1l": 94,
+        "real125": 43,
+        "real200": 59,
+        "realPet": 66,
+        "activ1l": 46,
+        "realActivCwApet": 30,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 41,
+        "koolerzPet": 31,
+        "hajmola": 43
       }
     },
     "2026-04-12": {
       "ssm1": {
-        "real1l": 89,
-        "real125": 45,
-        "real200": 60,
+        "real1l": 101,
+        "real125": 51,
+        "real200": 68,
         "realPet": 78,
-        "activ1l": 49,
-        "realActivCwApet": 27,
-        "realActivCwPet": 21,
-        "koolerzDrinks": 39,
-        "koolerzPet": 30,
-        "hajmola": 39
+        "activ1l": 45,
+        "realActivCwApet": 32,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 46,
+        "koolerzPet": 36,
+        "hajmola": 46
       },
       "ssm2": {
-        "real1l": 94,
-        "real125": 39,
-        "real200": 54,
+        "real1l": 92,
+        "real125": 43,
+        "real200": 63,
         "realPet": 65,
-        "activ1l": 42,
-        "realActivCwApet": 23,
-        "realActivCwPet": 18,
-        "koolerzDrinks": 33,
-        "koolerzPet": 28,
-        "hajmola": 36
+        "activ1l": 47,
+        "realActivCwApet": 30,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 42,
+        "koolerzPet": 32,
+        "hajmola": 39
       },
       "ssm3": {
-        "real1l": 87,
-        "real125": 43,
-        "real200": 60,
-        "realPet": 60,
-        "activ1l": 43,
+        "real1l": 95,
+        "real125": 44,
+        "real200": 59,
+        "realPet": 68,
+        "activ1l": 45,
         "realActivCwApet": 30,
-        "realActivCwPet": 27,
-        "koolerzDrinks": 31,
-        "koolerzPet": 27,
-        "hajmola": 32
+        "realActivCwPet": 25,
+        "koolerzDrinks": 40,
+        "koolerzPet": 34,
+        "hajmola": 41
       },
       "ssm4": {
-        "real1l": 77,
-        "real125": 32,
-        "real200": 48,
-        "realPet": 58,
-        "activ1l": 38,
-        "realActivCwApet": 24,
-        "realActivCwPet": 18,
-        "koolerzDrinks": 28,
-        "koolerzPet": 26,
-        "hajmola": 35
+        "real1l": 89,
+        "real125": 42,
+        "real200": 61,
+        "realPet": 62,
+        "activ1l": 45,
+        "realActivCwApet": 26,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 37,
+        "koolerzPet": 29,
+        "hajmola": 38
       },
       "ssm5": {
-        "real1l": 99,
-        "real125": 51,
-        "real200": 63,
-        "realPet": 67,
-        "activ1l": 41,
-        "realActivCwApet": 24,
-        "realActivCwPet": 20,
-        "koolerzDrinks": 33,
-        "koolerzPet": 30,
-        "hajmola": 50
+        "real1l": 96,
+        "real125": 46,
+        "real200": 65,
+        "realPet": 72,
+        "activ1l": 46,
+        "realActivCwApet": 30,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 44,
+        "koolerzPet": 32,
+        "hajmola": 45
       },
       "ssm6": {
-        "real1l": 78,
-        "real125": 42,
-        "real200": 52,
-        "realPet": 57,
-        "activ1l": 39,
+        "real1l": 87,
+        "real125": 45,
+        "real200": 61,
+        "realPet": 69,
+        "activ1l": 43,
         "realActivCwApet": 26,
-        "realActivCwPet": 21,
-        "koolerzDrinks": 33,
-        "koolerzPet": 24,
-        "hajmola": 37
+        "realActivCwPet": 23,
+        "koolerzDrinks": 39,
+        "koolerzPet": 31,
+        "hajmola": 41
       },
       "ssm7": {
-        "real1l": 93,
-        "real125": 45,
-        "real200": 58,
-        "realPet": 68,
-        "activ1l": 42,
-        "realActivCwApet": 28,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 37,
-        "koolerzPet": 28,
-        "hajmola": 43
+        "real1l": 97,
+        "real125": 46,
+        "real200": 63,
+        "realPet": 72,
+        "activ1l": 47,
+        "realActivCwApet": 29,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 42,
+        "koolerzPet": 36,
+        "hajmola": 44
       },
       "ssm8": {
-        "real1l": 71,
-        "real125": 30,
-        "real200": 47,
-        "realPet": 51,
-        "activ1l": 32,
-        "realActivCwApet": 20,
-        "realActivCwPet": 17,
-        "koolerzDrinks": 27,
-        "koolerzPet": 23,
-        "hajmola": 31
+        "real1l": 87,
+        "real125": 42,
+        "real200": 55,
+        "realPet": 64,
+        "activ1l": 38,
+        "realActivCwApet": 25,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 38,
+        "koolerzPet": 31,
+        "hajmola": 37
+      },
+      "ssm9": {
+        "real1l": 91,
+        "real125": 44,
+        "real200": 62,
+        "realPet": 74,
+        "activ1l": 48,
+        "realActivCwApet": 28,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 42,
+        "koolerzPet": 34,
+        "hajmola": 41
+      },
+      "ssm10": {
+        "real1l": 95,
+        "real125": 47,
+        "real200": 64,
+        "realPet": 68,
+        "activ1l": 44,
+        "realActivCwApet": 27,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 41,
+        "koolerzPet": 35,
+        "hajmola": 39
+      },
+      "ssm11": {
+        "real1l": 90,
+        "real125": 47,
+        "real200": 60,
+        "realPet": 73,
+        "activ1l": 46,
+        "realActivCwApet": 28,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 39,
+        "koolerzPet": 34,
+        "hajmola": 43
+      },
+      "ssm12": {
+        "real1l": 87,
+        "real125": 45,
+        "real200": 60,
+        "realPet": 75,
+        "activ1l": 46,
+        "realActivCwApet": 27,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 43,
+        "koolerzPet": 33,
+        "hajmola": 43
+      },
+      "ssm13": {
+        "real1l": 94,
+        "real125": 49,
+        "real200": 63,
+        "realPet": 75,
+        "activ1l": 48,
+        "realActivCwApet": 30,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 42,
+        "koolerzPet": 35,
+        "hajmola": 42
+      },
+      "ssm14": {
+        "real1l": 96,
+        "real125": 47,
+        "real200": 62,
+        "realPet": 68,
+        "activ1l": 44,
+        "realActivCwApet": 30,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 42,
+        "koolerzPet": 34,
+        "hajmola": 40
+      },
+      "ssm15": {
+        "real1l": 86,
+        "real125": 44,
+        "real200": 61,
+        "realPet": 69,
+        "activ1l": 46,
+        "realActivCwApet": 28,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 43,
+        "koolerzPet": 34,
+        "hajmola": 39
+      },
+      "ssm16": {
+        "real1l": 90,
+        "real125": 46,
+        "real200": 62,
+        "realPet": 68,
+        "activ1l": 45,
+        "realActivCwApet": 31,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 43,
+        "koolerzPet": 35,
+        "hajmola": 43
       }
     },
     "2026-04-16": {
       "ssm1": {
         "real1l": 97,
         "real125": 46,
-        "real200": 64,
-        "realPet": 81,
-        "activ1l": 45,
-        "realActivCwApet": 30,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 39,
-        "koolerzPet": 34,
-        "hajmola": 41
+        "real200": 66,
+        "realPet": 78,
+        "activ1l": 51,
+        "realActivCwApet": 33,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 46,
+        "koolerzPet": 36,
+        "hajmola": 45
       },
       "ssm2": {
         "real1l": 87,
-        "real125": 41,
-        "real200": 52,
-        "realPet": 63,
+        "real125": 44,
+        "real200": 61,
+        "realPet": 66,
         "activ1l": 44,
-        "realActivCwApet": 27,
-        "realActivCwPet": 18,
-        "koolerzDrinks": 33,
-        "koolerzPet": 28,
+        "realActivCwApet": 30,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 39,
+        "koolerzPet": 33,
         "hajmola": 39
       },
       "ssm3": {
-        "real1l": 91,
-        "real125": 45,
-        "real200": 56,
-        "realPet": 62,
-        "activ1l": 47,
-        "realActivCwApet": 32,
-        "realActivCwPet": 27,
-        "koolerzDrinks": 35,
-        "koolerzPet": 30,
-        "hajmola": 30
-      },
-      "ssm4": {
-        "real1l": 84,
-        "real125": 33,
-        "real200": 52,
-        "realPet": 60,
-        "activ1l": 37,
-        "realActivCwApet": 21,
-        "realActivCwPet": 17,
-        "koolerzDrinks": 31,
-        "koolerzPet": 24,
-        "hajmola": 35
-      },
-      "ssm5": {
-        "real1l": 97,
-        "real125": 47,
+        "real1l": 95,
+        "real125": 44,
         "real200": 63,
-        "realPet": 69,
-        "activ1l": 42,
-        "realActivCwApet": 28,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 34,
-        "koolerzPet": 31,
-        "hajmola": 46
-      },
-      "ssm6": {
-        "real1l": 77,
-        "real125": 43,
-        "real200": 55,
-        "realPet": 57,
-        "activ1l": 38,
-        "realActivCwApet": 25,
-        "realActivCwPet": 21,
-        "koolerzDrinks": 30,
-        "koolerzPet": 24,
+        "realPet": 73,
+        "activ1l": 44,
+        "realActivCwApet": 30,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 42,
+        "koolerzPet": 32,
         "hajmola": 42
       },
-      "ssm7": {
-        "real1l": 94,
-        "real125": 46,
-        "real200": 62,
-        "realPet": 68,
-        "activ1l": 43,
-        "realActivCwApet": 26,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 38,
+      "ssm4": {
+        "real1l": 83,
+        "real125": 42,
+        "real200": 61,
+        "realPet": 65,
+        "activ1l": 44,
+        "realActivCwApet": 29,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 37,
+        "koolerzPet": 29,
+        "hajmola": 39
+      },
+      "ssm5": {
+        "real1l": 102,
+        "real125": 47,
+        "real200": 66,
+        "realPet": 76,
+        "activ1l": 49,
+        "realActivCwApet": 31,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 42,
         "koolerzPet": 32,
-        "hajmola": 43
+        "hajmola": 41
+      },
+      "ssm6": {
+        "real1l": 84,
+        "real125": 45,
+        "real200": 61,
+        "realPet": 66,
+        "activ1l": 46,
+        "realActivCwApet": 29,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 41,
+        "koolerzPet": 33,
+        "hajmola": 38
+      },
+      "ssm7": {
+        "real1l": 100,
+        "real125": 51,
+        "real200": 62,
+        "realPet": 70,
+        "activ1l": 47,
+        "realActivCwApet": 31,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 43,
+        "koolerzPet": 36,
+        "hajmola": 41
       },
       "ssm8": {
-        "real1l": 83,
-        "real125": 31,
-        "real200": 45,
-        "realPet": 47,
-        "activ1l": 36,
-        "realActivCwApet": 23,
-        "realActivCwPet": 16,
-        "koolerzDrinks": 29,
-        "koolerzPet": 22,
-        "hajmola": 33
+        "real1l": 86,
+        "real125": 43,
+        "real200": 54,
+        "realPet": 67,
+        "activ1l": 44,
+        "realActivCwApet": 27,
+        "realActivCwPet": 20,
+        "koolerzDrinks": 41,
+        "koolerzPet": 32,
+        "hajmola": 37
+      },
+      "ssm9": {
+        "real1l": 93,
+        "real125": 46,
+        "real200": 64,
+        "realPet": 71,
+        "activ1l": 49,
+        "realActivCwApet": 31,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 45,
+        "koolerzPet": 35,
+        "hajmola": 44
+      },
+      "ssm10": {
+        "real1l": 96,
+        "real125": 46,
+        "real200": 66,
+        "realPet": 77,
+        "activ1l": 45,
+        "realActivCwApet": 31,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 42,
+        "koolerzPet": 34,
+        "hajmola": 44
+      },
+      "ssm11": {
+        "real1l": 91,
+        "real125": 49,
+        "real200": 66,
+        "realPet": 68,
+        "activ1l": 49,
+        "realActivCwApet": 29,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 43,
+        "koolerzPet": 33,
+        "hajmola": 40
+      },
+      "ssm12": {
+        "real1l": 98,
+        "real125": 45,
+        "real200": 61,
+        "realPet": 75,
+        "activ1l": 46,
+        "realActivCwApet": 31,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 41,
+        "koolerzPet": 32,
+        "hajmola": 45
+      },
+      "ssm13": {
+        "real1l": 88,
+        "real125": 48,
+        "real200": 64,
+        "realPet": 75,
+        "activ1l": 48,
+        "realActivCwApet": 30,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 44,
+        "koolerzPet": 32,
+        "hajmola": 41
+      },
+      "ssm14": {
+        "real1l": 96,
+        "real125": 46,
+        "real200": 64,
+        "realPet": 72,
+        "activ1l": 47,
+        "realActivCwApet": 29,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 42,
+        "koolerzPet": 35,
+        "hajmola": 41
+      },
+      "ssm15": {
+        "real1l": 90,
+        "real125": 44,
+        "real200": 61,
+        "realPet": 69,
+        "activ1l": 47,
+        "realActivCwApet": 31,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 41,
+        "koolerzPet": 34,
+        "hajmola": 44
+      },
+      "ssm16": {
+        "real1l": 99,
+        "real125": 47,
+        "real200": 62,
+        "realPet": 68,
+        "activ1l": 45,
+        "realActivCwApet": 29,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 40,
+        "koolerzPet": 34,
+        "hajmola": 41
       }
     },
     "2026-04-20": {
       "ssm1": {
         "real1l": 106,
-        "real125": 49,
-        "real200": 68,
-        "realPet": 82,
-        "activ1l": 45,
-        "realActivCwApet": 31,
-        "realActivCwPet": 23,
-        "koolerzDrinks": 43,
-        "koolerzPet": 35,
-        "hajmola": 46
+        "real125": 50,
+        "real200": 70,
+        "realPet": 74,
+        "activ1l": 53,
+        "realActivCwApet": 32,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 46,
+        "koolerzPet": 36,
+        "hajmola": 45
       },
       "ssm2": {
-        "real1l": 97,
-        "real125": 39,
-        "real200": 59,
-        "realPet": 61,
-        "activ1l": 44,
-        "realActivCwApet": 27,
-        "realActivCwPet": 19,
-        "koolerzDrinks": 37,
-        "koolerzPet": 29,
-        "hajmola": 36
+        "real1l": 89,
+        "real125": 44,
+        "real200": 67,
+        "realPet": 71,
+        "activ1l": 48,
+        "realActivCwApet": 29,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 43,
+        "koolerzPet": 32,
+        "hajmola": 40
       },
       "ssm3": {
-        "real1l": 92,
-        "real125": 41,
-        "real200": 54,
-        "realPet": 63,
-        "activ1l": 45,
-        "realActivCwApet": 34,
-        "realActivCwPet": 29,
-        "koolerzDrinks": 32,
-        "koolerzPet": 31,
-        "hajmola": 33
+        "real1l": 96,
+        "real125": 46,
+        "real200": 69,
+        "realPet": 70,
+        "activ1l": 49,
+        "realActivCwApet": 31,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 42,
+        "koolerzPet": 35,
+        "hajmola": 43
       },
       "ssm4": {
-        "real1l": 88,
-        "real125": 35,
-        "real200": 55,
-        "realPet": 53,
-        "activ1l": 43,
-        "realActivCwApet": 22,
-        "realActivCwPet": 20,
-        "koolerzDrinks": 31,
-        "koolerzPet": 23,
-        "hajmola": 35
+        "real1l": 87,
+        "real125": 46,
+        "real200": 64,
+        "realPet": 66,
+        "activ1l": 45,
+        "realActivCwApet": 28,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 42,
+        "koolerzPet": 31,
+        "hajmola": 38
       },
       "ssm5": {
-        "real1l": 100,
-        "real125": 49,
+        "real1l": 99,
+        "real125": 46,
         "real200": 64,
-        "realPet": 74,
-        "activ1l": 43,
-        "realActivCwApet": 27,
-        "realActivCwPet": 20,
-        "koolerzDrinks": 39,
-        "koolerzPet": 29,
-        "hajmola": 52
+        "realPet": 71,
+        "activ1l": 46,
+        "realActivCwApet": 31,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 43,
+        "koolerzPet": 34,
+        "hajmola": 45
       },
       "ssm6": {
-        "real1l": 86,
-        "real125": 43,
-        "real200": 57,
-        "realPet": 62,
-        "activ1l": 37,
-        "realActivCwApet": 23,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 32,
-        "koolerzPet": 26,
-        "hajmola": 42
-      },
-      "ssm7": {
         "real1l": 93,
         "real125": 45,
-        "real200": 58,
-        "realPet": 67,
+        "real200": 63,
+        "realPet": 74,
+        "activ1l": 47,
+        "realActivCwApet": 29,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 44,
+        "koolerzPet": 33,
+        "hajmola": 41
+      },
+      "ssm7": {
+        "real1l": 100,
+        "real125": 52,
+        "real200": 70,
+        "realPet": 72,
+        "activ1l": 47,
+        "realActivCwApet": 30,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 45,
+        "koolerzPet": 35,
+        "hajmola": 42
+      },
+      "ssm8": {
+        "real1l": 88,
+        "real125": 44,
+        "real200": 62,
+        "realPet": 66,
+        "activ1l": 43,
+        "realActivCwApet": 26,
+        "realActivCwPet": 21,
+        "koolerzDrinks": 39,
+        "koolerzPet": 31,
+        "hajmola": 38
+      },
+      "ssm9": {
+        "real1l": 90,
+        "real125": 51,
+        "real200": 68,
+        "realPet": 74,
+        "activ1l": 51,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 42,
+        "koolerzPet": 33,
+        "hajmola": 45
+      },
+      "ssm10": {
+        "real1l": 95,
+        "real125": 49,
+        "real200": 69,
+        "realPet": 71,
+        "activ1l": 48,
+        "realActivCwApet": 31,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 41,
+        "koolerzPet": 34,
+        "hajmola": 42
+      },
+      "ssm11": {
+        "real1l": 98,
+        "real125": 50,
+        "real200": 64,
+        "realPet": 76,
         "activ1l": 46,
-        "realActivCwApet": 27,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 36,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 44,
+        "koolerzPet": 35,
+        "hajmola": 42
+      },
+      "ssm12": {
+        "real1l": 93,
+        "real125": 51,
+        "real200": 64,
+        "realPet": 74,
+        "activ1l": 51,
+        "realActivCwApet": 31,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 43,
         "koolerzPet": 33,
         "hajmola": 43
       },
-      "ssm8": {
-        "real1l": 85,
-        "real125": 34,
-        "real200": 47,
-        "realPet": 52,
-        "activ1l": 32,
-        "realActivCwApet": 21,
-        "realActivCwPet": 17,
-        "koolerzDrinks": 30,
-        "koolerzPet": 24,
-        "hajmola": 32
+      "ssm13": {
+        "real1l": 99,
+        "real125": 49,
+        "real200": 67,
+        "realPet": 71,
+        "activ1l": 48,
+        "realActivCwApet": 32,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 45,
+        "koolerzPet": 33,
+        "hajmola": 46
+      },
+      "ssm14": {
+        "real1l": 97,
+        "real125": 46,
+        "real200": 62,
+        "realPet": 74,
+        "activ1l": 48,
+        "realActivCwApet": 29,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 46,
+        "koolerzPet": 35,
+        "hajmola": 41
+      },
+      "ssm15": {
+        "real1l": 100,
+        "real125": 48,
+        "real200": 67,
+        "realPet": 74,
+        "activ1l": 46,
+        "realActivCwApet": 32,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 42,
+        "koolerzPet": 35,
+        "hajmola": 43
+      },
+      "ssm16": {
+        "real1l": 101,
+        "real125": 48,
+        "real200": 68,
+        "realPet": 77,
+        "activ1l": 46,
+        "realActivCwApet": 32,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 46,
+        "koolerzPet": 35,
+        "hajmola": 45
       }
     },
     "2026-04-24": {
       "ssm1": {
-        "real1l": 101,
-        "real125": 45,
-        "real200": 66,
+        "real1l": 99,
+        "real125": 50,
+        "real200": 71,
         "realPet": 84,
-        "activ1l": 52,
-        "realActivCwApet": 29,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 41,
-        "koolerzPet": 35,
-        "hajmola": 43
+        "activ1l": 51,
+        "realActivCwApet": 31,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 46,
+        "koolerzPet": 37,
+        "hajmola": 47
       },
       "ssm2": {
-        "real1l": 99,
-        "real125": 43,
-        "real200": 60,
-        "realPet": 64,
-        "activ1l": 41,
-        "realActivCwApet": 24,
-        "realActivCwPet": 20,
-        "koolerzDrinks": 36,
-        "koolerzPet": 32,
-        "hajmola": 36
+        "real1l": 94,
+        "real125": 46,
+        "real200": 62,
+        "realPet": 75,
+        "activ1l": 48,
+        "realActivCwApet": 29,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 40,
+        "koolerzPet": 35,
+        "hajmola": 44
       },
       "ssm3": {
-        "real1l": 88,
-        "real125": 45,
-        "real200": 57,
-        "realPet": 70,
-        "activ1l": 47,
+        "real1l": 101,
+        "real125": 48,
+        "real200": 68,
+        "realPet": 78,
+        "activ1l": 52,
         "realActivCwApet": 31,
-        "realActivCwPet": 28,
-        "koolerzDrinks": 31,
-        "koolerzPet": 32,
-        "hajmola": 36
+        "realActivCwPet": 23,
+        "koolerzDrinks": 44,
+        "koolerzPet": 36,
+        "hajmola": 46
       },
       "ssm4": {
-        "real1l": 78,
-        "real125": 35,
-        "real200": 50,
-        "realPet": 62,
-        "activ1l": 41,
-        "realActivCwApet": 22,
-        "realActivCwPet": 18,
-        "koolerzDrinks": 34,
-        "koolerzPet": 25,
-        "hajmola": 38
-      },
-      "ssm5": {
-        "real1l": 101,
-        "real125": 55,
-        "real200": 65,
-        "realPet": 81,
-        "activ1l": 47,
-        "realActivCwApet": 28,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 38,
-        "koolerzPet": 34,
-        "hajmola": 50
-      },
-      "ssm6": {
-        "real1l": 93,
+        "real1l": 94,
         "real125": 44,
-        "real200": 56,
-        "realPet": 59,
-        "activ1l": 37,
-        "realActivCwApet": 26,
-        "realActivCwPet": 23,
-        "koolerzDrinks": 34,
-        "koolerzPet": 28,
-        "hajmola": 39
-      },
-      "ssm7": {
-        "real1l": 86,
-        "real125": 46,
-        "real200": 59,
-        "realPet": 68,
-        "activ1l": 48,
-        "realActivCwApet": 27,
+        "real200": 61,
+        "realPet": 69,
+        "activ1l": 46,
+        "realActivCwApet": 28,
         "realActivCwPet": 23,
         "koolerzDrinks": 39,
-        "koolerzPet": 33,
-        "hajmola": 40
+        "koolerzPet": 32,
+        "hajmola": 43
+      },
+      "ssm5": {
+        "real1l": 97,
+        "real125": 51,
+        "real200": 69,
+        "realPet": 80,
+        "activ1l": 52,
+        "realActivCwApet": 33,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 44,
+        "koolerzPet": 37,
+        "hajmola": 47
+      },
+      "ssm6": {
+        "real1l": 97,
+        "real125": 43,
+        "real200": 60,
+        "realPet": 73,
+        "activ1l": 49,
+        "realActivCwApet": 31,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 42,
+        "koolerzPet": 32,
+        "hajmola": 43
+      },
+      "ssm7": {
+        "real1l": 105,
+        "real125": 50,
+        "real200": 70,
+        "realPet": 82,
+        "activ1l": 47,
+        "realActivCwApet": 33,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 45,
+        "koolerzPet": 35,
+        "hajmola": 46
       },
       "ssm8": {
-        "real1l": 80,
-        "real125": 34,
-        "real200": 49,
-        "realPet": 50,
-        "activ1l": 35,
-        "realActivCwApet": 24,
-        "realActivCwPet": 17,
-        "koolerzDrinks": 31,
-        "koolerzPet": 25,
-        "hajmola": 34
+        "real1l": 88,
+        "real125": 46,
+        "real200": 57,
+        "realPet": 64,
+        "activ1l": 46,
+        "realActivCwApet": 28,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 42,
+        "koolerzPet": 30,
+        "hajmola": 40
+      },
+      "ssm9": {
+        "real1l": 94,
+        "real125": 47,
+        "real200": 62,
+        "realPet": 78,
+        "activ1l": 51,
+        "realActivCwApet": 32,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 44,
+        "koolerzPet": 35,
+        "hajmola": 45
+      },
+      "ssm10": {
+        "real1l": 99,
+        "real125": 48,
+        "real200": 64,
+        "realPet": 79,
+        "activ1l": 47,
+        "realActivCwApet": 31,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 43,
+        "koolerzPet": 36,
+        "hajmola": 45
+      },
+      "ssm11": {
+        "real1l": 104,
+        "real125": 47,
+        "real200": 71,
+        "realPet": 77,
+        "activ1l": 47,
+        "realActivCwApet": 31,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 46,
+        "koolerzPet": 33,
+        "hajmola": 45
+      },
+      "ssm12": {
+        "real1l": 97,
+        "real125": 51,
+        "real200": 65,
+        "realPet": 78,
+        "activ1l": 49,
+        "realActivCwApet": 30,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 45,
+        "koolerzPet": 36,
+        "hajmola": 46
+      },
+      "ssm13": {
+        "real1l": 99,
+        "real125": 51,
+        "real200": 68,
+        "realPet": 79,
+        "activ1l": 50,
+        "realActivCwApet": 30,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 45,
+        "koolerzPet": 36,
+        "hajmola": 42
+      },
+      "ssm14": {
+        "real1l": 95,
+        "real125": 50,
+        "real200": 64,
+        "realPet": 72,
+        "activ1l": 49,
+        "realActivCwApet": 33,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 47,
+        "koolerzPet": 37,
+        "hajmola": 43
+      },
+      "ssm15": {
+        "real1l": 102,
+        "real125": 49,
+        "real200": 69,
+        "realPet": 78,
+        "activ1l": 48,
+        "realActivCwApet": 29,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 42,
+        "koolerzPet": 38,
+        "hajmola": 46
+      },
+      "ssm16": {
+        "real1l": 100,
+        "real125": 52,
+        "real200": 70,
+        "realPet": 78,
+        "activ1l": 48,
+        "realActivCwApet": 32,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 44,
+        "koolerzPet": 35,
+        "hajmola": 45
       }
     },
     "2026-04-27": {
       "ssm1": {
-        "real1l": 102,
-        "real125": 44,
-        "real200": 66,
-        "realPet": 83,
-        "activ1l": 53,
-        "realActivCwApet": 34,
-        "realActivCwPet": 24,
-        "koolerzDrinks": 43,
-        "koolerzPet": 35,
-        "hajmola": 46
+        "real1l": 107,
+        "real125": 53,
+        "real200": 74,
+        "realPet": 85,
+        "activ1l": 50,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 50,
+        "koolerzPet": 38,
+        "hajmola": 50
       },
       "ssm2": {
-        "real1l": 91,
-        "real125": 40,
-        "real200": 59,
-        "realPet": 63,
-        "activ1l": 42,
-        "realActivCwApet": 27,
-        "realActivCwPet": 21,
-        "koolerzDrinks": 35,
-        "koolerzPet": 30,
-        "hajmola": 37
-      },
-      "ssm3": {
         "real1l": 93,
-        "real125": 42,
-        "real200": 60,
-        "realPet": 70,
-        "activ1l": 44,
-        "realActivCwApet": 34,
-        "realActivCwPet": 26,
-        "koolerzDrinks": 35,
-        "koolerzPet": 29,
-        "hajmola": 34
-      },
-      "ssm4": {
-        "real1l": 81,
-        "real125": 36,
-        "real200": 56,
-        "realPet": 58,
-        "activ1l": 43,
-        "realActivCwApet": 26,
-        "realActivCwPet": 18,
-        "koolerzDrinks": 31,
-        "koolerzPet": 24,
-        "hajmola": 37
-      },
-      "ssm5": {
-        "real1l": 108,
-        "real125": 51,
-        "real200": 67,
-        "realPet": 80,
-        "activ1l": 46,
-        "realActivCwApet": 29,
-        "realActivCwPet": 23,
-        "koolerzDrinks": 37,
-        "koolerzPet": 30,
-        "hajmola": 48
-      },
-      "ssm6": {
-        "real1l": 83,
         "real125": 45,
-        "real200": 58,
-        "realPet": 60,
-        "activ1l": 40,
-        "realActivCwApet": 27,
-        "realActivCwPet": 21,
-        "koolerzDrinks": 35,
-        "koolerzPet": 29,
-        "hajmola": 39
-      },
-      "ssm7": {
-        "real1l": 99,
-        "real125": 52,
-        "real200": 59,
-        "realPet": 66,
+        "real200": 69,
+        "realPet": 78,
         "activ1l": 47,
         "realActivCwApet": 30,
-        "realActivCwPet": 26,
-        "koolerzDrinks": 38,
-        "koolerzPet": 33,
-        "hajmola": 40
+        "realActivCwPet": 23,
+        "koolerzDrinks": 46,
+        "koolerzPet": 34,
+        "hajmola": 44
+      },
+      "ssm3": {
+        "real1l": 94,
+        "real125": 52,
+        "real200": 65,
+        "realPet": 76,
+        "activ1l": 51,
+        "realActivCwApet": 33,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 45,
+        "koolerzPet": 37,
+        "hajmola": 43
+      },
+      "ssm4": {
+        "real1l": 90,
+        "real125": 43,
+        "real200": 62,
+        "realPet": 70,
+        "activ1l": 48,
+        "realActivCwApet": 27,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 41,
+        "koolerzPet": 35,
+        "hajmola": 43
+      },
+      "ssm5": {
+        "real1l": 96,
+        "real125": 52,
+        "real200": 70,
+        "realPet": 83,
+        "activ1l": 50,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 44,
+        "koolerzPet": 39,
+        "hajmola": 46
+      },
+      "ssm6": {
+        "real1l": 96,
+        "real125": 48,
+        "real200": 65,
+        "realPet": 68,
+        "activ1l": 49,
+        "realActivCwApet": 29,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 43,
+        "koolerzPet": 32,
+        "hajmola": 44
+      },
+      "ssm7": {
+        "real1l": 98,
+        "real125": 49,
+        "real200": 73,
+        "realPet": 77,
+        "activ1l": 49,
+        "realActivCwApet": 34,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 49,
+        "koolerzPet": 35,
+        "hajmola": 44
       },
       "ssm8": {
-        "real1l": 85,
-        "real125": 36,
-        "real200": 47,
-        "realPet": 56,
-        "activ1l": 39,
-        "realActivCwApet": 23,
-        "realActivCwPet": 16,
-        "koolerzDrinks": 33,
-        "koolerzPet": 25,
-        "hajmola": 32
+        "real1l": 87,
+        "real125": 43,
+        "real200": 62,
+        "realPet": 65,
+        "activ1l": 42,
+        "realActivCwApet": 30,
+        "realActivCwPet": 22,
+        "koolerzDrinks": 40,
+        "koolerzPet": 31,
+        "hajmola": 38
+      },
+      "ssm9": {
+        "real1l": 103,
+        "real125": 50,
+        "real200": 70,
+        "realPet": 77,
+        "activ1l": 51,
+        "realActivCwApet": 32,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 45,
+        "koolerzPet": 38,
+        "hajmola": 42
+      },
+      "ssm10": {
+        "real1l": 103,
+        "real125": 52,
+        "real200": 68,
+        "realPet": 76,
+        "activ1l": 53,
+        "realActivCwApet": 30,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 45,
+        "koolerzPet": 37,
+        "hajmola": 45
+      },
+      "ssm11": {
+        "real1l": 105,
+        "real125": 47,
+        "real200": 64,
+        "realPet": 78,
+        "activ1l": 47,
+        "realActivCwApet": 31,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 45,
+        "koolerzPet": 35,
+        "hajmola": 48
+      },
+      "ssm12": {
+        "real1l": 100,
+        "real125": 49,
+        "real200": 69,
+        "realPet": 73,
+        "activ1l": 51,
+        "realActivCwApet": 33,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 47,
+        "koolerzPet": 37,
+        "hajmola": 43
+      },
+      "ssm13": {
+        "real1l": 99,
+        "real125": 48,
+        "real200": 66,
+        "realPet": 76,
+        "activ1l": 49,
+        "realActivCwApet": 30,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 46,
+        "koolerzPet": 36,
+        "hajmola": 43
+      },
+      "ssm14": {
+        "real1l": 105,
+        "real125": 47,
+        "real200": 71,
+        "realPet": 73,
+        "activ1l": 47,
+        "realActivCwApet": 33,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 46,
+        "koolerzPet": 37,
+        "hajmola": 46
+      },
+      "ssm15": {
+        "real1l": 97,
+        "real125": 47,
+        "real200": 66,
+        "realPet": 78,
+        "activ1l": 51,
+        "realActivCwApet": 33,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 48,
+        "koolerzPet": 37,
+        "hajmola": 44
+      },
+      "ssm16": {
+        "real1l": 100,
+        "real125": 48,
+        "real200": 69,
+        "realPet": 74,
+        "activ1l": 47,
+        "realActivCwApet": 33,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 47,
+        "koolerzPet": 36,
+        "hajmola": 47
       }
     },
     "2026-04-30": {
       "ssm1": {
-        "real1l": 105,
-        "real125": 48,
-        "real200": 69,
-        "realPet": 80,
+        "real1l": 111,
+        "real125": 57,
+        "real200": 76,
+        "realPet": 83,
         "activ1l": 54,
-        "realActivCwApet": 34,
-        "realActivCwPet": 23,
-        "koolerzDrinks": 46,
-        "koolerzPet": 36,
-        "hajmola": 49
+        "realActivCwApet": 32,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 50,
+        "koolerzPet": 38,
+        "hajmola": 46
       },
       "ssm2": {
         "real1l": 101,
-        "real125": 42,
-        "real200": 63,
-        "realPet": 75,
-        "activ1l": 43,
-        "realActivCwApet": 28,
-        "realActivCwPet": 21,
-        "koolerzDrinks": 37,
-        "koolerzPet": 31,
-        "hajmola": 41
-      },
-      "ssm3": {
-        "real1l": 90,
-        "real125": 49,
+        "real125": 48,
         "real200": 66,
-        "realPet": 66,
+        "realPet": 71,
         "activ1l": 52,
         "realActivCwApet": 32,
-        "realActivCwPet": 28,
-        "koolerzDrinks": 36,
-        "koolerzPet": 31,
-        "hajmola": 33
+        "realActivCwPet": 25,
+        "koolerzDrinks": 43,
+        "koolerzPet": 36,
+        "hajmola": 42
+      },
+      "ssm3": {
+        "real1l": 105,
+        "real125": 49,
+        "real200": 68,
+        "realPet": 77,
+        "activ1l": 50,
+        "realActivCwApet": 33,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 46,
+        "koolerzPet": 35,
+        "hajmola": 43
       },
       "ssm4": {
-        "real1l": 92,
-        "real125": 35,
-        "real200": 52,
-        "realPet": 63,
-        "activ1l": 42,
-        "realActivCwApet": 26,
-        "realActivCwPet": 20,
-        "koolerzDrinks": 33,
-        "koolerzPet": 25,
+        "real1l": 89,
+        "real125": 47,
+        "real200": 65,
+        "realPet": 70,
+        "activ1l": 48,
+        "realActivCwApet": 30,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 41,
+        "koolerzPet": 35,
         "hajmola": 40
       },
       "ssm5": {
-        "real1l": 95,
-        "real125": 55,
-        "real200": 66,
-        "realPet": 81,
-        "activ1l": 48,
-        "realActivCwApet": 29,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 42,
-        "koolerzPet": 31,
-        "hajmola": 49
+        "real1l": 102,
+        "real125": 50,
+        "real200": 72,
+        "realPet": 80,
+        "activ1l": 53,
+        "realActivCwApet": 31,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 48,
+        "koolerzPet": 35,
+        "hajmola": 46
       },
       "ssm6": {
         "real1l": 93,
-        "real125": 43,
-        "real200": 59,
-        "realPet": 64,
-        "activ1l": 40,
-        "realActivCwApet": 26,
-        "realActivCwPet": 24,
-        "koolerzDrinks": 35,
-        "koolerzPet": 29,
-        "hajmola": 41
+        "real125": 46,
+        "real200": 64,
+        "realPet": 73,
+        "activ1l": 45,
+        "realActivCwApet": 32,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 43,
+        "koolerzPet": 36,
+        "hajmola": 44
       },
       "ssm7": {
-        "real1l": 92,
-        "real125": 47,
-        "real200": 61,
-        "realPet": 68,
-        "activ1l": 50,
+        "real1l": 109,
+        "real125": 54,
+        "real200": 67,
+        "realPet": 84,
+        "activ1l": 49,
         "realActivCwApet": 31,
-        "realActivCwPet": 24,
-        "koolerzDrinks": 37,
-        "koolerzPet": 33,
-        "hajmola": 46
+        "realActivCwPet": 28,
+        "koolerzDrinks": 50,
+        "koolerzPet": 38,
+        "hajmola": 48
       },
       "ssm8": {
-        "real1l": 91,
-        "real125": 36,
-        "real200": 50,
-        "realPet": 51,
-        "activ1l": 35,
-        "realActivCwApet": 22,
-        "realActivCwPet": 17,
-        "koolerzDrinks": 29,
-        "koolerzPet": 25,
-        "hajmola": 32
+        "real1l": 94,
+        "real125": 45,
+        "real200": 59,
+        "realPet": 66,
+        "activ1l": 45,
+        "realActivCwApet": 30,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 43,
+        "koolerzPet": 35,
+        "hajmola": 39
+      },
+      "ssm9": {
+        "real1l": 106,
+        "real125": 49,
+        "real200": 70,
+        "realPet": 79,
+        "activ1l": 50,
+        "realActivCwApet": 31,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 45,
+        "koolerzPet": 35,
+        "hajmola": 46
+      },
+      "ssm10": {
+        "real1l": 96,
+        "real125": 51,
+        "real200": 73,
+        "realPet": 77,
+        "activ1l": 52,
+        "realActivCwApet": 34,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 44,
+        "koolerzPet": 35,
+        "hajmola": 44
+      },
+      "ssm11": {
+        "real1l": 103,
+        "real125": 52,
+        "real200": 71,
+        "realPet": 75,
+        "activ1l": 52,
+        "realActivCwApet": 32,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 48,
+        "koolerzPet": 37,
+        "hajmola": 49
+      },
+      "ssm12": {
+        "real1l": 102,
+        "real125": 52,
+        "real200": 70,
+        "realPet": 82,
+        "activ1l": 52,
+        "realActivCwApet": 31,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 46,
+        "koolerzPet": 36,
+        "hajmola": 45
+      },
+      "ssm13": {
+        "real1l": 95,
+        "real125": 51,
+        "real200": 67,
+        "realPet": 78,
+        "activ1l": 48,
+        "realActivCwApet": 34,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 48,
+        "koolerzPet": 39,
+        "hajmola": 47
+      },
+      "ssm14": {
+        "real1l": 101,
+        "real125": 50,
+        "real200": 70,
+        "realPet": 81,
+        "activ1l": 53,
+        "realActivCwApet": 32,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 47,
+        "koolerzPet": 36,
+        "hajmola": 46
+      },
+      "ssm15": {
+        "real1l": 97,
+        "real125": 48,
+        "real200": 66,
+        "realPet": 82,
+        "activ1l": 50,
+        "realActivCwApet": 33,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 44,
+        "koolerzPet": 36,
+        "hajmola": 46
+      },
+      "ssm16": {
+        "real1l": 101,
+        "real125": 51,
+        "real200": 66,
+        "realPet": 77,
+        "activ1l": 49,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 47,
+        "koolerzPet": 38,
+        "hajmola": 47
       }
     },
     "2026-05-13": {
       "ssm1": {
-        "real1l": 120,
-        "real125": 55,
-        "real200": 78,
-        "realPet": 92,
-        "activ1l": 58,
+        "real1l": 104,
+        "real125": 52,
+        "real200": 77,
+        "realPet": 83,
+        "activ1l": 57,
         "realActivCwApet": 36,
-        "realActivCwPet": 28,
-        "koolerzDrinks": 48,
-        "koolerzPet": 40,
-        "hajmola": 52
+        "realActivCwPet": 30,
+        "koolerzDrinks": 53,
+        "koolerzPet": 39,
+        "hajmola": 51
       },
       "ssm2": {
-        "real1l": 110,
-        "real125": 48,
-        "real200": 68,
-        "realPet": 78,
-        "activ1l": 50,
-        "realActivCwApet": 30,
-        "realActivCwPet": 24,
-        "koolerzDrinks": 42,
-        "koolerzPet": 35,
-        "hajmola": 45
-      },
-      "ssm3": {
-        "real1l": 105,
-        "real125": 52,
-        "real200": 70,
-        "realPet": 80,
-        "activ1l": 55,
-        "realActivCwApet": 38,
-        "realActivCwPet": 32,
-        "koolerzDrinks": 40,
-        "koolerzPet": 36,
-        "hajmola": 40
-      },
-      "ssm4": {
-        "real1l": 98,
-        "real125": 42,
-        "real200": 62,
-        "realPet": 68,
-        "activ1l": 48,
-        "realActivCwApet": 28,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 38,
-        "koolerzPet": 30,
-        "hajmola": 42
-      },
-      "ssm5": {
-        "real1l": 115,
-        "real125": 60,
-        "real200": 75,
-        "realPet": 88,
-        "activ1l": 52,
-        "realActivCwApet": 32,
-        "realActivCwPet": 25,
-        "koolerzDrinks": 45,
-        "koolerzPet": 38,
-        "hajmola": 58
-      },
-      "ssm6": {
-        "real1l": 102,
+        "real1l": 97,
         "real125": 50,
-        "real200": 66,
-        "realPet": 72,
-        "activ1l": 45,
-        "realActivCwApet": 30,
-        "realActivCwPet": 26,
-        "koolerzDrinks": 40,
-        "koolerzPet": 32,
+        "real200": 74,
+        "realPet": 81,
+        "activ1l": 50,
+        "realActivCwApet": 33,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 45,
+        "koolerzPet": 36,
         "hajmola": 48
       },
-      "ssm7": {
-        "real1l": 108,
-        "real125": 56,
-        "real200": 72,
-        "realPet": 82,
-        "activ1l": 56,
+      "ssm3": {
+        "real1l": 109,
+        "real125": 54,
+        "real200": 75,
+        "realPet": 84,
+        "activ1l": 54,
         "realActivCwApet": 34,
-        "realActivCwPet": 28,
-        "koolerzDrinks": 44,
-        "koolerzPet": 37,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 47,
+        "koolerzPet": 38,
+        "hajmola": 47
+      },
+      "ssm4": {
+        "real1l": 93,
+        "real125": 47,
+        "real200": 70,
+        "realPet": 75,
+        "activ1l": 47,
+        "realActivCwApet": 29,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 46,
+        "koolerzPet": 33,
+        "hajmola": 45
+      },
+      "ssm5": {
+        "real1l": 112,
+        "real125": 56,
+        "real200": 69,
+        "realPet": 81,
+        "activ1l": 55,
+        "realActivCwApet": 32,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 47,
+        "koolerzPet": 41,
         "hajmola": 50
       },
+      "ssm6": {
+        "real1l": 104,
+        "real125": 48,
+        "real200": 68,
+        "realPet": 76,
+        "activ1l": 51,
+        "realActivCwApet": 31,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 44,
+        "koolerzPet": 37,
+        "hajmola": 45
+      },
+      "ssm7": {
+        "real1l": 109,
+        "real125": 53,
+        "real200": 77,
+        "realPet": 83,
+        "activ1l": 56,
+        "realActivCwApet": 34,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 52,
+        "koolerzPet": 39,
+        "hajmola": 48
+      },
       "ssm8": {
-        "real1l": 95,
-        "real125": 40,
-        "real200": 58,
-        "realPet": 62,
-        "activ1l": 42,
-        "realActivCwApet": 26,
-        "realActivCwPet": 20,
-        "koolerzDrinks": 35,
-        "koolerzPet": 28,
-        "hajmola": 38
+        "real1l": 93,
+        "real125": 47,
+        "real200": 68,
+        "realPet": 76,
+        "activ1l": 49,
+        "realActivCwApet": 29,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 44,
+        "koolerzPet": 36,
+        "hajmola": 43
+      },
+      "ssm9": {
+        "real1l": 100,
+        "real125": 55,
+        "real200": 75,
+        "realPet": 79,
+        "activ1l": 54,
+        "realActivCwApet": 32,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 46,
+        "koolerzPet": 38,
+        "hajmola": 51
+      },
+      "ssm10": {
+        "real1l": 101,
+        "real125": 52,
+        "real200": 70,
+        "realPet": 76,
+        "activ1l": 49,
+        "realActivCwApet": 33,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 51,
+        "koolerzPet": 38,
+        "hajmola": 45
+      },
+      "ssm11": {
+        "real1l": 111,
+        "real125": 55,
+        "real200": 73,
+        "realPet": 84,
+        "activ1l": 50,
+        "realActivCwApet": 33,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 49,
+        "koolerzPet": 36,
+        "hajmola": 49
+      },
+      "ssm12": {
+        "real1l": 104,
+        "real125": 49,
+        "real200": 68,
+        "realPet": 79,
+        "activ1l": 55,
+        "realActivCwApet": 34,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 48,
+        "koolerzPet": 36,
+        "hajmola": 46
+      },
+      "ssm13": {
+        "real1l": 102,
+        "real125": 49,
+        "real200": 71,
+        "realPet": 84,
+        "activ1l": 52,
+        "realActivCwApet": 32,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 48,
+        "koolerzPet": 36,
+        "hajmola": 48
+      },
+      "ssm14": {
+        "real1l": 102,
+        "real125": 50,
+        "real200": 71,
+        "realPet": 82,
+        "activ1l": 51,
+        "realActivCwApet": 33,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 45,
+        "koolerzPet": 41,
+        "hajmola": 45
+      },
+      "ssm15": {
+        "real1l": 105,
+        "real125": 53,
+        "real200": 76,
+        "realPet": 82,
+        "activ1l": 52,
+        "realActivCwApet": 33,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 51,
+        "koolerzPet": 37,
+        "hajmola": 45
+      },
+      "ssm16": {
+        "real1l": 109,
+        "real125": 51,
+        "real200": 74,
+        "realPet": 83,
+        "activ1l": 54,
+        "realActivCwApet": 34,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 45,
+        "koolerzPet": 38,
+        "hajmola": 50
       }
     },
     "2026-05-14": {
       "ssm1": {
-        "real1l": 122,
+        "real1l": 107,
         "real125": 58,
-        "real200": 80,
-        "realPet": 95,
-        "activ1l": 60,
-        "realActivCwApet": 38,
-        "realActivCwPet": 30,
-        "koolerzDrinks": 50,
-        "koolerzPet": 42,
-        "hajmola": 54
+        "real200": 76,
+        "realPet": 89,
+        "activ1l": 57,
+        "realActivCwApet": 37,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 53,
+        "koolerzPet": 40,
+        "hajmola": 49
       },
       "ssm2": {
-        "real1l": 112,
+        "real1l": 97,
         "real125": 50,
-        "real200": 70,
-        "realPet": 80,
+        "real200": 66,
+        "realPet": 84,
         "activ1l": 52,
+        "realActivCwApet": 35,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 45,
+        "koolerzPet": 39,
+        "hajmola": 45
+      },
+      "ssm3": {
+        "real1l": 104,
+        "real125": 55,
+        "real200": 76,
+        "realPet": 80,
+        "activ1l": 51,
+        "realActivCwApet": 33,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 50,
+        "koolerzPet": 41,
+        "hajmola": 48
+      },
+      "ssm4": {
+        "real1l": 104,
+        "real125": 49,
+        "real200": 67,
+        "realPet": 80,
+        "activ1l": 49,
         "realActivCwApet": 32,
-        "realActivCwPet": 25,
-        "koolerzDrinks": 44,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 42,
         "koolerzPet": 36,
         "hajmola": 46
       },
-      "ssm3": {
-        "real1l": 107,
-        "real125": 54,
-        "real200": 72,
-        "realPet": 83,
-        "activ1l": 56,
-        "realActivCwApet": 40,
-        "realActivCwPet": 34,
-        "koolerzDrinks": 42,
-        "koolerzPet": 38,
-        "hajmola": 42
-      },
-      "ssm4": {
-        "real1l": 100,
-        "real125": 44,
-        "real200": 64,
-        "realPet": 70,
-        "activ1l": 50,
-        "realActivCwApet": 30,
-        "realActivCwPet": 24,
-        "koolerzDrinks": 40,
-        "koolerzPet": 32,
-        "hajmola": 44
-      },
       "ssm5": {
-        "real1l": 118,
-        "real125": 62,
-        "real200": 78,
-        "realPet": 92,
-        "activ1l": 54,
-        "realActivCwApet": 34,
+        "real1l": 109,
+        "real125": 53,
+        "real200": 70,
+        "realPet": 86,
+        "activ1l": 53,
+        "realActivCwApet": 35,
         "realActivCwPet": 27,
-        "koolerzDrinks": 48,
-        "koolerzPet": 40,
-        "hajmola": 60
+        "koolerzDrinks": 51,
+        "koolerzPet": 39,
+        "hajmola": 46
       },
       "ssm6": {
-        "real1l": 104,
-        "real125": 52,
-        "real200": 68,
-        "realPet": 74,
-        "activ1l": 47,
-        "realActivCwApet": 32,
-        "realActivCwPet": 28,
-        "koolerzDrinks": 42,
-        "koolerzPet": 34,
-        "hajmola": 50
+        "real1l": 106,
+        "real125": 50,
+        "real200": 73,
+        "realPet": 76,
+        "activ1l": 54,
+        "realActivCwApet": 34,
+        "realActivCwPet": 24,
+        "koolerzDrinks": 47,
+        "koolerzPet": 36,
+        "hajmola": 48
       },
       "ssm7": {
-        "real1l": 110,
+        "real1l": 112,
         "real125": 58,
-        "real200": 74,
-        "realPet": 85,
-        "activ1l": 58,
-        "realActivCwApet": 36,
-        "realActivCwPet": 30,
-        "koolerzDrinks": 46,
+        "real200": 71,
+        "realPet": 86,
+        "activ1l": 57,
+        "realActivCwApet": 33,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 52,
         "koolerzPet": 39,
-        "hajmola": 52
+        "hajmola": 49
       },
       "ssm8": {
         "real1l": 97,
-        "real125": 42,
-        "real200": 60,
-        "realPet": 64,
-        "activ1l": 44,
-        "realActivCwApet": 28,
-        "realActivCwPet": 22,
-        "koolerzDrinks": 36,
-        "koolerzPet": 30,
-        "hajmola": 40
+        "real125": 49,
+        "real200": 67,
+        "realPet": 78,
+        "activ1l": 47,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 44,
+        "koolerzPet": 34,
+        "hajmola": 44
+      },
+      "ssm9": {
+        "real1l": 103,
+        "real125": 51,
+        "real200": 75,
+        "realPet": 82,
+        "activ1l": 52,
+        "realActivCwApet": 34,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 47,
+        "koolerzPet": 38,
+        "hajmola": 51
+      },
+      "ssm10": {
+        "real1l": 103,
+        "real125": 56,
+        "real200": 72,
+        "realPet": 78,
+        "activ1l": 56,
+        "realActivCwApet": 34,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 48,
+        "koolerzPet": 37,
+        "hajmola": 50
+      },
+      "ssm11": {
+        "real1l": 111,
+        "real125": 52,
+        "real200": 71,
+        "realPet": 78,
+        "activ1l": 53,
+        "realActivCwApet": 36,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 50,
+        "koolerzPet": 41,
+        "hajmola": 49
+      },
+      "ssm12": {
+        "real1l": 110,
+        "real125": 53,
+        "real200": 69,
+        "realPet": 79,
+        "activ1l": 51,
+        "realActivCwApet": 35,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 49,
+        "koolerzPet": 38,
+        "hajmola": 50
+      },
+      "ssm13": {
+        "real1l": 107,
+        "real125": 54,
+        "real200": 69,
+        "realPet": 80,
+        "activ1l": 57,
+        "realActivCwApet": 35,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 50,
+        "koolerzPet": 40,
+        "hajmola": 46
+      },
+      "ssm14": {
+        "real1l": 113,
+        "real125": 54,
+        "real200": 72,
+        "realPet": 84,
+        "activ1l": 52,
+        "realActivCwApet": 36,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 49,
+        "koolerzPet": 37,
+        "hajmola": 51
+      },
+      "ssm15": {
+        "real1l": 105,
+        "real125": 56,
+        "real200": 68,
+        "realPet": 78,
+        "activ1l": 51,
+        "realActivCwApet": 32,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 50,
+        "koolerzPet": 38,
+        "hajmola": 51
+      },
+      "ssm16": {
+        "real1l": 112,
+        "real125": 56,
+        "real200": 70,
+        "realPet": 84,
+        "activ1l": 54,
+        "realActivCwApet": 32,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 49,
+        "koolerzPet": 39,
+        "hajmola": 46
       }
     },
     "2026-05-15": {
       "ssm1": {
-        "real1l": 125,
-        "real125": 60,
-        "real200": 82,
-        "realPet": 98,
-        "activ1l": 62,
-        "realActivCwApet": 40,
-        "realActivCwPet": 32,
-        "koolerzDrinks": 52,
-        "koolerzPet": 44,
-        "hajmola": 56
-      },
-      "ssm2": {
-        "real1l": 115,
-        "real125": 52,
-        "real200": 72,
-        "realPet": 83,
-        "activ1l": 54,
-        "realActivCwApet": 34,
-        "realActivCwPet": 26,
-        "koolerzDrinks": 46,
-        "koolerzPet": 38,
+        "real1l": 120,
+        "real125": 54,
+        "real200": 79,
+        "realPet": 90,
+        "activ1l": 57,
+        "realActivCwApet": 38,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 54,
+        "koolerzPet": 39,
         "hajmola": 48
       },
+      "ssm2": {
+        "real1l": 106,
+        "real125": 53,
+        "real200": 73,
+        "realPet": 84,
+        "activ1l": 52,
+        "realActivCwApet": 34,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 48,
+        "koolerzPet": 37,
+        "hajmola": 50
+      },
       "ssm3": {
-        "real1l": 110,
+        "real1l": 107,
         "real125": 56,
-        "real200": 74,
-        "realPet": 86,
-        "activ1l": 58,
-        "realActivCwApet": 42,
-        "realActivCwPet": 36,
-        "koolerzDrinks": 44,
-        "koolerzPet": 40,
-        "hajmola": 44
+        "real200": 75,
+        "realPet": 81,
+        "activ1l": 51,
+        "realActivCwApet": 32,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 49,
+        "koolerzPet": 38,
+        "hajmola": 50
       },
       "ssm4": {
-        "real1l": 102,
-        "real125": 46,
-        "real200": 66,
-        "realPet": 72,
-        "activ1l": 52,
-        "realActivCwApet": 32,
-        "realActivCwPet": 26,
-        "koolerzDrinks": 42,
-        "koolerzPet": 34,
-        "hajmola": 46
+        "real1l": 97,
+        "real125": 51,
+        "real200": 70,
+        "realPet": 80,
+        "activ1l": 53,
+        "realActivCwApet": 30,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 45,
+        "koolerzPet": 35,
+        "hajmola": 45
       },
       "ssm5": {
-        "real1l": 120,
-        "real125": 64,
-        "real200": 80,
-        "realPet": 95,
+        "real1l": 107,
+        "real125": 53,
+        "real200": 71,
+        "realPet": 83,
+        "activ1l": 54,
+        "realActivCwApet": 35,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 52,
+        "koolerzPet": 38,
+        "hajmola": 49
+      },
+      "ssm6": {
+        "real1l": 103,
+        "real125": 50,
+        "real200": 72,
+        "realPet": 79,
+        "activ1l": 51,
+        "realActivCwApet": 33,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 44,
+        "koolerzPet": 39,
+        "hajmola": 47
+      },
+      "ssm7": {
+        "real1l": 118,
+        "real125": 53,
+        "real200": 74,
+        "realPet": 81,
+        "activ1l": 55,
+        "realActivCwApet": 37,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 50,
+        "koolerzPet": 41,
+        "hajmola": 53
+      },
+      "ssm8": {
+        "real1l": 96,
+        "real125": 51,
+        "real200": 68,
+        "realPet": 77,
+        "activ1l": 48,
+        "realActivCwApet": 30,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 42,
+        "koolerzPet": 35,
+        "hajmola": 42
+      },
+      "ssm9": {
+        "real1l": 108,
+        "real125": 56,
+        "real200": 71,
+        "realPet": 89,
+        "activ1l": 55,
+        "realActivCwApet": 33,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 48,
+        "koolerzPet": 41,
+        "hajmola": 48
+      },
+      "ssm10": {
+        "real1l": 114,
+        "real125": 56,
+        "real200": 71,
+        "realPet": 83,
+        "activ1l": 54,
+        "realActivCwApet": 32,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 48,
+        "koolerzPet": 39,
+        "hajmola": 49
+      },
+      "ssm11": {
+        "real1l": 109,
+        "real125": 54,
+        "real200": 72,
+        "realPet": 84,
+        "activ1l": 51,
+        "realActivCwApet": 36,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 48,
+        "koolerzPet": 38,
+        "hajmola": 51
+      },
+      "ssm12": {
+        "real1l": 108,
+        "real125": 55,
+        "real200": 72,
+        "realPet": 87,
+        "activ1l": 53,
+        "realActivCwApet": 35,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 49,
+        "koolerzPet": 41,
+        "hajmola": 50
+      },
+      "ssm13": {
+        "real1l": 110,
+        "real125": 51,
+        "real200": 73,
+        "realPet": 88,
         "activ1l": 56,
         "realActivCwApet": 36,
         "realActivCwPet": 28,
         "koolerzDrinks": 50,
-        "koolerzPet": 42,
-        "hajmola": 62
+        "koolerzPet": 40,
+        "hajmola": 47
       },
-      "ssm6": {
-        "real1l": 106,
-        "real125": 54,
-        "real200": 70,
-        "realPet": 76,
-        "activ1l": 48,
-        "realActivCwApet": 34,
-        "realActivCwPet": 30,
-        "koolerzDrinks": 44,
-        "koolerzPet": 36,
-        "hajmola": 52
+      "ssm14": {
+        "real1l": 110,
+        "real125": 55,
+        "real200": 77,
+        "realPet": 79,
+        "activ1l": 55,
+        "realActivCwApet": 32,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 46,
+        "koolerzPet": 37,
+        "hajmola": 48
       },
-      "ssm7": {
-        "real1l": 112,
-        "real125": 60,
-        "real200": 76,
-        "realPet": 88,
-        "activ1l": 60,
-        "realActivCwApet": 38,
-        "realActivCwPet": 32,
+      "ssm15": {
+        "real1l": 103,
+        "real125": 55,
+        "real200": 73,
+        "realPet": 86,
+        "activ1l": 57,
+        "realActivCwApet": 36,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 46,
+        "koolerzPet": 37,
+        "hajmola": 47
+      },
+      "ssm16": {
+        "real1l": 105,
+        "real125": 55,
+        "real200": 74,
+        "realPet": 81,
+        "activ1l": 52,
+        "realActivCwApet": 36,
+        "realActivCwPet": 27,
         "koolerzDrinks": 48,
         "koolerzPet": 41,
-        "hajmola": 54
-      },
-      "ssm8": {
-        "real1l": 99,
-        "real125": 44,
-        "real200": 62,
-        "realPet": 66,
-        "activ1l": 46,
-        "realActivCwApet": 30,
-        "realActivCwPet": 24,
-        "koolerzDrinks": 38,
-        "koolerzPet": 32,
-        "hajmola": 42
+        "hajmola": 50
       }
     },
     "2026-05-16": {
       "ssm1": {
-        "real1l": 126,
-        "real125": 62,
-        "real200": 84,
-        "realPet": 100,
-        "activ1l": 64,
-        "realActivCwApet": 42,
-        "realActivCwPet": 33,
-        "koolerzDrinks": 54,
-        "koolerzPet": 45,
-        "hajmola": 58
+        "real1l": 117,
+        "real125": 59,
+        "real200": 79,
+        "realPet": 85,
+        "activ1l": 55,
+        "realActivCwApet": 37,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 55,
+        "koolerzPet": 41,
+        "hajmola": 51
       },
       "ssm2": {
-        "real1l": 116,
+        "real1l": 102,
         "real125": 54,
-        "real200": 74,
-        "realPet": 85,
+        "real200": 70,
+        "realPet": 80,
         "activ1l": 56,
         "realActivCwApet": 35,
-        "realActivCwPet": 27,
-        "koolerzDrinks": 47,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 46,
         "koolerzPet": 39,
-        "hajmola": 50
+        "hajmola": 47
       },
       "ssm3": {
-        "real1l": 112,
-        "real125": 58,
-        "real200": 76,
+        "real1l": 116,
+        "real125": 57,
+        "real200": 79,
         "realPet": 88,
-        "activ1l": 60,
-        "realActivCwApet": 44,
-        "realActivCwPet": 38,
-        "koolerzDrinks": 45,
-        "koolerzPet": 42,
-        "hajmola": 45
-      },
-      "ssm4": {
-        "real1l": 104,
-        "real125": 48,
-        "real200": 68,
-        "realPet": 74,
-        "activ1l": 54,
+        "activ1l": 53,
         "realActivCwApet": 34,
-        "realActivCwPet": 28,
-        "koolerzDrinks": 44,
-        "koolerzPet": 36,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 49,
+        "koolerzPet": 39,
         "hajmola": 48
       },
-      "ssm5": {
-        "real1l": 122,
-        "real125": 66,
-        "real200": 82,
-        "realPet": 98,
-        "activ1l": 58,
-        "realActivCwApet": 37,
-        "realActivCwPet": 29,
-        "koolerzDrinks": 52,
-        "koolerzPet": 43,
-        "hajmola": 63
-      },
-      "ssm6": {
-        "real1l": 108,
-        "real125": 56,
-        "real200": 72,
-        "realPet": 78,
-        "activ1l": 50,
-        "realActivCwApet": 36,
-        "realActivCwPet": 32,
+      "ssm4": {
+        "real1l": 100,
+        "real125": 48,
+        "real200": 69,
+        "realPet": 82,
+        "activ1l": 51,
+        "realActivCwApet": 30,
+        "realActivCwPet": 26,
         "koolerzDrinks": 46,
-        "koolerzPet": 38,
+        "koolerzPet": 35,
+        "hajmola": 47
+      },
+      "ssm5": {
+        "real1l": 112,
+        "real125": 57,
+        "real200": 71,
+        "realPet": 85,
+        "activ1l": 57,
+        "realActivCwApet": 34,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 47,
+        "koolerzPet": 41,
         "hajmola": 53
       },
+      "ssm6": {
+        "real1l": 102,
+        "real125": 55,
+        "real200": 74,
+        "realPet": 80,
+        "activ1l": 50,
+        "realActivCwApet": 35,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 48,
+        "koolerzPet": 40,
+        "hajmola": 45
+      },
       "ssm7": {
-        "real1l": 114,
-        "real125": 62,
-        "real200": 78,
-        "realPet": 90,
-        "activ1l": 62,
-        "realActivCwApet": 40,
-        "realActivCwPet": 34,
-        "koolerzDrinks": 50,
+        "real1l": 113,
+        "real125": 56,
+        "real200": 79,
+        "realPet": 92,
+        "activ1l": 59,
+        "realActivCwApet": 34,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 49,
         "koolerzPet": 43,
-        "hajmola": 56
+        "hajmola": 54
       },
       "ssm8": {
-        "real1l": 101,
-        "real125": 46,
-        "real200": 64,
-        "realPet": 68,
-        "activ1l": 48,
-        "realActivCwApet": 32,
-        "realActivCwPet": 26,
-        "koolerzDrinks": 40,
+        "real1l": 97,
+        "real125": 49,
+        "real200": 71,
+        "realPet": 80,
+        "activ1l": 52,
+        "realActivCwApet": 33,
+        "realActivCwPet": 23,
+        "koolerzDrinks": 45,
         "koolerzPet": 34,
-        "hajmola": 44
+        "hajmola": 47
+      },
+      "ssm9": {
+        "real1l": 106,
+        "real125": 58,
+        "real200": 75,
+        "realPet": 84,
+        "activ1l": 58,
+        "realActivCwApet": 36,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 48,
+        "koolerzPet": 38,
+        "hajmola": 47
+      },
+      "ssm10": {
+        "real1l": 108,
+        "real125": 53,
+        "real200": 71,
+        "realPet": 87,
+        "activ1l": 57,
+        "realActivCwApet": 35,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 47,
+        "koolerzPet": 41,
+        "hajmola": 52
+      },
+      "ssm11": {
+        "real1l": 114,
+        "real125": 55,
+        "real200": 70,
+        "realPet": 86,
+        "activ1l": 52,
+        "realActivCwApet": 33,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 48,
+        "koolerzPet": 38,
+        "hajmola": 48
+      },
+      "ssm12": {
+        "real1l": 113,
+        "real125": 58,
+        "real200": 72,
+        "realPet": 87,
+        "activ1l": 51,
+        "realActivCwApet": 35,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 47,
+        "koolerzPet": 38,
+        "hajmola": 48
+      },
+      "ssm13": {
+        "real1l": 108,
+        "real125": 55,
+        "real200": 78,
+        "realPet": 86,
+        "activ1l": 53,
+        "realActivCwApet": 33,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 48,
+        "koolerzPet": 40,
+        "hajmola": 48
+      },
+      "ssm14": {
+        "real1l": 104,
+        "real125": 52,
+        "real200": 77,
+        "realPet": 85,
+        "activ1l": 54,
+        "realActivCwApet": 35,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 50,
+        "koolerzPet": 40,
+        "hajmola": 48
+      },
+      "ssm15": {
+        "real1l": 105,
+        "real125": 56,
+        "real200": 78,
+        "realPet": 80,
+        "activ1l": 54,
+        "realActivCwApet": 36,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 50,
+        "koolerzPet": 37,
+        "hajmola": 50
+      },
+      "ssm16": {
+        "real1l": 109,
+        "real125": 55,
+        "real200": 71,
+        "realPet": 82,
+        "activ1l": 55,
+        "realActivCwApet": 33,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 50,
+        "koolerzPet": 38,
+        "hajmola": 50
       }
     },
     "2026-05-17": {
       "ssm1": {
-        "real1l": 128,
-        "real125": 64,
-        "real200": 86,
-        "realPet": 102,
-        "activ1l": 66,
-        "realActivCwApet": 44,
-        "realActivCwPet": 35,
-        "koolerzDrinks": 56,
-        "koolerzPet": 47,
-        "hajmola": 60
+        "real1l": 121,
+        "real125": 58,
+        "real200": 79,
+        "realPet": 89,
+        "activ1l": 55,
+        "realActivCwApet": 37,
+        "realActivCwPet": 31,
+        "koolerzDrinks": 54,
+        "koolerzPet": 42,
+        "hajmola": 55
       },
       "ssm2": {
-        "real1l": 118,
-        "real125": 56,
-        "real200": 76,
-        "realPet": 87,
-        "activ1l": 58,
-        "realActivCwApet": 37,
-        "realActivCwPet": 28,
-        "koolerzDrinks": 49,
-        "koolerzPet": 40,
-        "hajmola": 52
-      },
-      "ssm3": {
-        "real1l": 114,
-        "real125": 60,
-        "real200": 78,
-        "realPet": 90,
-        "activ1l": 62,
-        "realActivCwApet": 46,
-        "realActivCwPet": 40,
-        "koolerzDrinks": 47,
-        "koolerzPet": 44,
-        "hajmola": 46
-      },
-      "ssm4": {
-        "real1l": 106,
-        "real125": 50,
-        "real200": 70,
-        "realPet": 76,
-        "activ1l": 56,
+        "real1l": 110,
+        "real125": 54,
+        "real200": 69,
+        "realPet": 81,
+        "activ1l": 50,
         "realActivCwApet": 36,
         "realActivCwPet": 29,
         "koolerzDrinks": 46,
-        "koolerzPet": 38,
-        "hajmola": 50
-      },
-      "ssm5": {
-        "real1l": 124,
-        "real125": 68,
-        "real200": 84,
-        "realPet": 100,
-        "activ1l": 60,
-        "realActivCwApet": 39,
-        "realActivCwPet": 30,
-        "koolerzDrinks": 54,
-        "koolerzPet": 45,
-        "hajmola": 65
-      },
-      "ssm6": {
-        "real1l": 110,
-        "real125": 58,
-        "real200": 74,
-        "realPet": 80,
-        "activ1l": 52,
-        "realActivCwApet": 38,
-        "realActivCwPet": 33,
-        "koolerzDrinks": 48,
-        "koolerzPet": 40,
-        "hajmola": 55
-      },
-      "ssm7": {
-        "real1l": 116,
-        "real125": 64,
-        "real200": 80,
-        "realPet": 92,
-        "activ1l": 64,
-        "realActivCwApet": 42,
-        "realActivCwPet": 36,
-        "koolerzDrinks": 52,
-        "koolerzPet": 45,
-        "hajmola": 58
-      },
-      "ssm8": {
-        "real1l": 103,
-        "real125": 48,
-        "real200": 66,
-        "realPet": 70,
-        "activ1l": 50,
-        "realActivCwApet": 34,
-        "realActivCwPet": 27,
-        "koolerzDrinks": 42,
-        "koolerzPet": 35,
-        "hajmola": 46
-      }
-    },
-    "2026-05-18": {
-      "ssm1": {
-        "real1l": 130,
-        "real125": 66,
-        "real200": 88,
-        "realPet": 105,
-        "activ1l": 68,
-        "realActivCwApet": 45,
-        "realActivCwPet": 36,
-        "koolerzDrinks": 57,
-        "koolerzPet": 48,
-        "hajmola": 62
-      },
-      "ssm2": {
-        "real1l": 120,
-        "real125": 58,
-        "real200": 78,
-        "realPet": 89,
-        "activ1l": 60,
-        "realActivCwApet": 38,
-        "realActivCwPet": 29,
-        "koolerzDrinks": 50,
         "koolerzPet": 41,
-        "hajmola": 54
+        "hajmola": 46
       },
       "ssm3": {
-        "real1l": 116,
-        "real125": 62,
-        "real200": 80,
-        "realPet": 92,
-        "activ1l": 64,
-        "realActivCwApet": 48,
-        "realActivCwPet": 42,
-        "koolerzDrinks": 48,
-        "koolerzPet": 46,
-        "hajmola": 48
+        "real1l": 109,
+        "real125": 57,
+        "real200": 78,
+        "realPet": 91,
+        "activ1l": 56,
+        "realActivCwApet": 35,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 49,
+        "koolerzPet": 42,
+        "hajmola": 53
       },
       "ssm4": {
-        "real1l": 108,
+        "real1l": 100,
         "real125": 52,
+        "real200": 71,
+        "realPet": 79,
+        "activ1l": 52,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 46,
+        "koolerzPet": 37,
+        "hajmola": 48
+      },
+      "ssm5": {
+        "real1l": 108,
+        "real125": 53,
         "real200": 72,
-        "realPet": 78,
+        "realPet": 85,
         "activ1l": 58,
-        "realActivCwApet": 38,
-        "realActivCwPet": 30,
+        "realActivCwApet": 36,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 53,
+        "koolerzPet": 40,
+        "hajmola": 50
+      },
+      "ssm6": {
+        "real1l": 102,
+        "real125": 55,
+        "real200": 74,
+        "realPet": 77,
+        "activ1l": 55,
+        "realActivCwApet": 33,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 50,
+        "koolerzPet": 36,
+        "hajmola": 46
+      },
+      "ssm7": {
+        "real1l": 108,
+        "real125": 53,
+        "real200": 78,
+        "realPet": 90,
+        "activ1l": 53,
+        "realActivCwApet": 37,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 50,
+        "koolerzPet": 40,
+        "hajmola": 54
+      },
+      "ssm8": {
+        "real1l": 94,
+        "real125": 50,
+        "real200": 66,
+        "realPet": 80,
+        "activ1l": 51,
+        "realActivCwApet": 31,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 46,
+        "koolerzPet": 35,
+        "hajmola": 44
+      },
+      "ssm9": {
+        "real1l": 105,
+        "real125": 56,
+        "real200": 72,
+        "realPet": 83,
+        "activ1l": 52,
+        "realActivCwApet": 37,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 53,
+        "koolerzPet": 41,
+        "hajmola": 50
+      },
+      "ssm10": {
+        "real1l": 110,
+        "real125": 59,
+        "real200": 80,
+        "realPet": 87,
+        "activ1l": 57,
+        "realActivCwApet": 34,
+        "realActivCwPet": 28,
         "koolerzDrinks": 48,
         "koolerzPet": 39,
         "hajmola": 52
       },
+      "ssm11": {
+        "real1l": 110,
+        "real125": 58,
+        "real200": 73,
+        "realPet": 88,
+        "activ1l": 57,
+        "realActivCwApet": 37,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 53,
+        "koolerzPet": 40,
+        "hajmola": 48
+      },
+      "ssm12": {
+        "real1l": 107,
+        "real125": 53,
+        "real200": 77,
+        "realPet": 90,
+        "activ1l": 58,
+        "realActivCwApet": 33,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 48,
+        "koolerzPet": 39,
+        "hajmola": 51
+      },
+      "ssm13": {
+        "real1l": 112,
+        "real125": 58,
+        "real200": 72,
+        "realPet": 88,
+        "activ1l": 57,
+        "realActivCwApet": 35,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 53,
+        "koolerzPet": 39,
+        "hajmola": 53
+      },
+      "ssm14": {
+        "real1l": 103,
+        "real125": 58,
+        "real200": 80,
+        "realPet": 81,
+        "activ1l": 59,
+        "realActivCwApet": 35,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 51,
+        "koolerzPet": 39,
+        "hajmola": 53
+      },
+      "ssm15": {
+        "real1l": 111,
+        "real125": 57,
+        "real200": 74,
+        "realPet": 86,
+        "activ1l": 54,
+        "realActivCwApet": 34,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 50,
+        "koolerzPet": 38,
+        "hajmola": 53
+      },
+      "ssm16": {
+        "real1l": 110,
+        "real125": 58,
+        "real200": 79,
+        "realPet": 84,
+        "activ1l": 55,
+        "realActivCwApet": 35,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 48,
+        "koolerzPet": 39,
+        "hajmola": 53
+      }
+    },
+    "2026-05-18": {
+      "ssm1": {
+        "real1l": 118,
+        "real125": 58,
+        "real200": 76,
+        "realPet": 89,
+        "activ1l": 58,
+        "realActivCwApet": 39,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 54,
+        "koolerzPet": 44,
+        "hajmola": 52
+      },
+      "ssm2": {
+        "real1l": 113,
+        "real125": 57,
+        "real200": 75,
+        "realPet": 84,
+        "activ1l": 52,
+        "realActivCwApet": 36,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 51,
+        "koolerzPet": 39,
+        "hajmola": 52
+      },
+      "ssm3": {
+        "real1l": 112,
+        "real125": 57,
+        "real200": 72,
+        "realPet": 81,
+        "activ1l": 58,
+        "realActivCwApet": 38,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 52,
+        "koolerzPet": 40,
+        "hajmola": 53
+      },
+      "ssm4": {
+        "real1l": 99,
+        "real125": 53,
+        "real200": 66,
+        "realPet": 79,
+        "activ1l": 51,
+        "realActivCwApet": 33,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 47,
+        "koolerzPet": 37,
+        "hajmola": 47
+      },
       "ssm5": {
-        "real1l": 126,
-        "real125": 70,
-        "real200": 86,
-        "realPet": 102,
-        "activ1l": 62,
-        "realActivCwApet": 40,
-        "realActivCwPet": 31,
-        "koolerzDrinks": 56,
-        "koolerzPet": 47,
-        "hajmola": 68
+        "real1l": 107,
+        "real125": 57,
+        "real200": 73,
+        "realPet": 88,
+        "activ1l": 55,
+        "realActivCwApet": 38,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 54,
+        "koolerzPet": 42,
+        "hajmola": 54
       },
       "ssm6": {
         "real1l": 112,
-        "real125": 60,
-        "real200": 76,
-        "realPet": 82,
-        "activ1l": 54,
-        "realActivCwApet": 40,
-        "realActivCwPet": 34,
-        "koolerzDrinks": 50,
-        "koolerzPet": 42,
-        "hajmola": 56
-      },
-      "ssm7": {
-        "real1l": 118,
-        "real125": 66,
-        "real200": 82,
-        "realPet": 94,
-        "activ1l": 66,
-        "realActivCwApet": 44,
-        "realActivCwPet": 37,
-        "koolerzDrinks": 54,
-        "koolerzPet": 47,
-        "hajmola": 60
-      },
-      "ssm8": {
-        "real1l": 105,
         "real125": 50,
         "real200": 68,
-        "realPet": 72,
-        "activ1l": 52,
+        "realPet": 78,
+        "activ1l": 51,
+        "realActivCwApet": 34,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 47,
+        "koolerzPet": 38,
+        "hajmola": 47
+      },
+      "ssm7": {
+        "real1l": 114,
+        "real125": 58,
+        "real200": 83,
+        "realPet": 86,
+        "activ1l": 59,
+        "realActivCwApet": 38,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 55,
+        "koolerzPet": 43,
+        "hajmola": 49
+      },
+      "ssm8": {
+        "real1l": 99,
+        "real125": 51,
+        "real200": 65,
+        "realPet": 73,
+        "activ1l": 48,
+        "realActivCwApet": 32,
+        "realActivCwPet": 25,
+        "koolerzDrinks": 47,
+        "koolerzPet": 37,
+        "hajmola": 48
+      },
+      "ssm9": {
+        "real1l": 106,
+        "real125": 56,
+        "real200": 72,
+        "realPet": 83,
+        "activ1l": 59,
+        "realActivCwApet": 37,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 48,
+        "koolerzPet": 38,
+        "hajmola": 54
+      },
+      "ssm10": {
+        "real1l": 117,
+        "real125": 56,
+        "real200": 71,
+        "realPet": 91,
+        "activ1l": 54,
+        "realActivCwApet": 38,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 52,
+        "koolerzPet": 42,
+        "hajmola": 50
+      },
+      "ssm11": {
+        "real1l": 105,
+        "real125": 53,
+        "real200": 74,
+        "realPet": 90,
+        "activ1l": 55,
+        "realActivCwApet": 37,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 52,
+        "koolerzPet": 39,
+        "hajmola": 54
+      },
+      "ssm12": {
+        "real1l": 115,
+        "real125": 56,
+        "real200": 81,
+        "realPet": 81,
+        "activ1l": 55,
+        "realActivCwApet": 37,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 53,
+        "koolerzPet": 43,
+        "hajmola": 50
+      },
+      "ssm13": {
+        "real1l": 116,
+        "real125": 52,
+        "real200": 74,
+        "realPet": 92,
+        "activ1l": 56,
+        "realActivCwApet": 35,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 50,
+        "koolerzPet": 42,
+        "hajmola": 52
+      },
+      "ssm14": {
+        "real1l": 106,
+        "real125": 57,
+        "real200": 79,
+        "realPet": 89,
+        "activ1l": 53,
+        "realActivCwApet": 34,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 52,
+        "koolerzPet": 42,
+        "hajmola": 50
+      },
+      "ssm15": {
+        "real1l": 106,
+        "real125": 52,
+        "real200": 74,
+        "realPet": 85,
+        "activ1l": 54,
+        "realActivCwApet": 34,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 50,
+        "koolerzPet": 41,
+        "hajmola": 50
+      },
+      "ssm16": {
+        "real1l": 105,
+        "real125": 55,
+        "real200": 72,
+        "realPet": 87,
+        "activ1l": 55,
         "realActivCwApet": 35,
         "realActivCwPet": 28,
-        "koolerzDrinks": 43,
-        "koolerzPet": 36,
-        "hajmola": 48
+        "koolerzDrinks": 50,
+        "koolerzPet": 38,
+        "hajmola": 53
       }
     },
     "2026-05-19": {
       "ssm1": {
-        "real1l": 132,
-        "real125": 68,
-        "real200": 90,
-        "realPet": 108,
-        "activ1l": 70,
-        "realActivCwApet": 46,
-        "realActivCwPet": 37,
-        "koolerzDrinks": 58,
-        "koolerzPet": 50,
-        "hajmola": 64
+        "real1l": 125,
+        "real125": 63,
+        "real200": 82,
+        "realPet": 88,
+        "activ1l": 58,
+        "realActivCwApet": 36,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 54,
+        "koolerzPet": 41,
+        "hajmola": 53
       },
       "ssm2": {
-        "real1l": 122,
-        "real125": 60,
-        "real200": 80,
-        "realPet": 91,
-        "activ1l": 62,
-        "realActivCwApet": 40,
-        "realActivCwPet": 30,
-        "koolerzDrinks": 52,
-        "koolerzPet": 42,
-        "hajmola": 56
+        "real1l": 108,
+        "real125": 55,
+        "real200": 71,
+        "realPet": 82,
+        "activ1l": 53,
+        "realActivCwApet": 35,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 48,
+        "koolerzPet": 38,
+        "hajmola": 49
       },
       "ssm3": {
-        "real1l": 118,
-        "real125": 64,
-        "real200": 82,
-        "realPet": 94,
-        "activ1l": 66,
-        "realActivCwApet": 50,
-        "realActivCwPet": 44,
-        "koolerzDrinks": 50,
-        "koolerzPet": 48,
-        "hajmola": 50
+        "real1l": 120,
+        "real125": 55,
+        "real200": 78,
+        "realPet": 91,
+        "activ1l": 55,
+        "realActivCwApet": 35,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 54,
+        "koolerzPet": 44,
+        "hajmola": 49
       },
       "ssm4": {
-        "real1l": 110,
-        "real125": 54,
-        "real200": 74,
-        "realPet": 80,
-        "activ1l": 60,
-        "realActivCwApet": 40,
-        "realActivCwPet": 32,
-        "koolerzDrinks": 50,
-        "koolerzPet": 41,
-        "hajmola": 54
+        "real1l": 101,
+        "real125": 55,
+        "real200": 68,
+        "realPet": 78,
+        "activ1l": 55,
+        "realActivCwApet": 35,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 48,
+        "koolerzPet": 38,
+        "hajmola": 48
       },
       "ssm5": {
-        "real1l": 128,
-        "real125": 72,
-        "real200": 88,
-        "realPet": 104,
-        "activ1l": 64,
-        "realActivCwApet": 42,
-        "realActivCwPet": 33,
-        "koolerzDrinks": 58,
-        "koolerzPet": 49,
-        "hajmola": 70
+        "real1l": 111,
+        "real125": 57,
+        "real200": 82,
+        "realPet": 88,
+        "activ1l": 55,
+        "realActivCwApet": 37,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 53,
+        "koolerzPet": 43,
+        "hajmola": 53
       },
       "ssm6": {
         "real1l": 114,
-        "real125": 62,
-        "real200": 78,
-        "realPet": 84,
-        "activ1l": 56,
-        "realActivCwApet": 42,
-        "realActivCwPet": 36,
-        "koolerzDrinks": 52,
-        "koolerzPet": 44,
-        "hajmola": 58
+        "real125": 53,
+        "real200": 75,
+        "realPet": 82,
+        "activ1l": 52,
+        "realActivCwApet": 35,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 51,
+        "koolerzPet": 39,
+        "hajmola": 49
       },
       "ssm7": {
-        "real1l": 120,
-        "real125": 68,
-        "real200": 84,
-        "realPet": 96,
-        "activ1l": 68,
-        "realActivCwApet": 46,
-        "realActivCwPet": 39,
-        "koolerzDrinks": 56,
-        "koolerzPet": 49,
-        "hajmola": 62
+        "real1l": 118,
+        "real125": 56,
+        "real200": 81,
+        "realPet": 92,
+        "activ1l": 60,
+        "realActivCwApet": 35,
+        "realActivCwPet": 32,
+        "koolerzDrinks": 53,
+        "koolerzPet": 42,
+        "hajmola": 53
       },
       "ssm8": {
         "real1l": 107,
         "real125": 52,
         "real200": 70,
-        "realPet": 74,
-        "activ1l": 54,
+        "realPet": 82,
+        "activ1l": 50,
+        "realActivCwApet": 34,
+        "realActivCwPet": 26,
+        "koolerzDrinks": 47,
+        "koolerzPet": 35,
+        "hajmola": 48
+      },
+      "ssm9": {
+        "real1l": 115,
+        "real125": 55,
+        "real200": 78,
+        "realPet": 82,
+        "activ1l": 60,
+        "realActivCwApet": 37,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 53,
+        "koolerzPet": 44,
+        "hajmola": 51
+      },
+      "ssm10": {
+        "real1l": 106,
+        "real125": 55,
+        "real200": 77,
+        "realPet": 87,
+        "activ1l": 57,
         "realActivCwApet": 36,
         "realActivCwPet": 29,
-        "koolerzDrinks": 45,
-        "koolerzPet": 37,
+        "koolerzDrinks": 51,
+        "koolerzPet": 43,
+        "hajmola": 52
+      },
+      "ssm11": {
+        "real1l": 113,
+        "real125": 55,
+        "real200": 72,
+        "realPet": 83,
+        "activ1l": 56,
+        "realActivCwApet": 38,
+        "realActivCwPet": 27,
+        "koolerzDrinks": 54,
+        "koolerzPet": 39,
         "hajmola": 50
+      },
+      "ssm12": {
+        "real1l": 112,
+        "real125": 54,
+        "real200": 77,
+        "realPet": 87,
+        "activ1l": 56,
+        "realActivCwApet": 37,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 50,
+        "koolerzPet": 43,
+        "hajmola": 49
+      },
+      "ssm13": {
+        "real1l": 118,
+        "real125": 58,
+        "real200": 79,
+        "realPet": 83,
+        "activ1l": 60,
+        "realActivCwApet": 35,
+        "realActivCwPet": 28,
+        "koolerzDrinks": 49,
+        "koolerzPet": 41,
+        "hajmola": 54
+      },
+      "ssm14": {
+        "real1l": 109,
+        "real125": 56,
+        "real200": 74,
+        "realPet": 89,
+        "activ1l": 56,
+        "realActivCwApet": 34,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 49,
+        "koolerzPet": 42,
+        "hajmola": 51
+      },
+      "ssm15": {
+        "real1l": 116,
+        "real125": 54,
+        "real200": 80,
+        "realPet": 91,
+        "activ1l": 53,
+        "realActivCwApet": 34,
+        "realActivCwPet": 30,
+        "koolerzDrinks": 49,
+        "koolerzPet": 40,
+        "hajmola": 51
+      },
+      "ssm16": {
+        "real1l": 109,
+        "real125": 59,
+        "real200": 77,
+        "realPet": 89,
+        "activ1l": 57,
+        "realActivCwApet": 36,
+        "realActivCwPet": 29,
+        "koolerzDrinks": 50,
+        "koolerzPet": 43,
+        "hajmola": 52
       }
     }
   }
@@ -2293,6 +3872,11 @@
 const BRAND_COLORS = { Real:'#f97316', Activ:'#16a34a', Koolerz:'#3b82f6', Hajmola:'#8b5cf6' };
 const STORAGE_KEY = 'ecoDashboardData_v1';
 const SESSION_KEY = 'ecoSession_v1';
+const FB_CONFIG_KEY = 'ecoFbConfig_v1';
+const FB_DOC_PATH = ['dashboard', 'main']; // collection, doc
+
+// Firebase runtime state
+const FB = { app:null, db:null, auth:null, connected:false, listening:false, _pushDebounceId:null, _suppressNextPush:false };
 
 let DATA = null;
 let currentSSM = null;
@@ -2326,6 +3910,9 @@ function boot(){
 
   // auto-enter if session present
   if(currentSSM){ enterDashboard(); }
+
+  // kick off cloud sync if previously configured
+  autoInitFirebase();
 }
 
 function todayISO(){ return new Date().toISOString().slice(0,10); }
@@ -2336,7 +3923,15 @@ function fmtDate(iso){
   return new Date(iso+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
 }
 
-function saveData(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+function saveData(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+  // mirror to cloud if enabled
+  if(FB.connected && FB.db && !FB._suppressNextPush){
+    FB._pushDebounceId && clearTimeout(FB._pushDebounceId);
+    FB._pushDebounceId = setTimeout(() => firebaseSave().catch(e => console.warn('FB save fail:', e)), 600);
+  }
+  FB._suppressNextPush = false;
+}
 function saveSession(){ localStorage.setItem(SESSION_KEY, JSON.stringify({ssm:currentSSM})); }
 
 /* ---------- SHA-256 ---------- */
@@ -2344,6 +3939,152 @@ async function sha256(text){
   const buf = new TextEncoder().encode(text);
   const hash = await crypto.subtle.digest('SHA-256', buf);
   return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ---------- Firebase Firestore sync ---------- */
+function getStoredFbConfig(){
+  try { return JSON.parse(localStorage.getItem(FB_CONFIG_KEY) || 'null'); } catch(e){ return null; }
+}
+function setStoredFbConfig(cfg){ localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg)); }
+function clearStoredFbConfig(){ localStorage.removeItem(FB_CONFIG_KEY); }
+function setCloudStatus(text, color){
+  const pill = document.getElementById('hdrCloud');
+  if(pill){ pill.style.display = text ? 'inline-block' : 'none'; pill.textContent = text || ''; }
+  const s = document.getElementById('fbStatus');
+  if(s){ s.textContent = text || 'Not connected'; s.style.color = color || 'var(--ink)'; }
+}
+
+// Parses a config that may be either valid JSON or a JS-object-literal-style paste (with unquoted keys)
+function parseFbConfigText(text){
+  text = (text||'').trim();
+  if(!text) throw new Error('Empty config');
+  try { return JSON.parse(text); } catch(e){}
+  // Strip leading "const x =" or trailing ";"
+  text = text.replace(/^[^{]*?({)/, '$1').replace(/;?\s*$/,'');
+  // Quote unquoted keys: { apiKey: "..." }  ->  { "apiKey": "..." }
+  const json = text.replace(/([,{]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":').replace(/'/g,'"');
+  return JSON.parse(json);
+}
+
+async function initFirebaseFromConfig(cfg){
+  if(!window.firebase) throw new Error('Firebase SDK failed to load (offline?)');
+  if(FB.app){ try { await FB.app.delete(); } catch(e){} FB.app=null; FB.db=null; FB.auth=null; }
+  FB.app = firebase.initializeApp(cfg, 'eco-dashboard-' + Date.now());
+  FB.auth = firebase.auth(FB.app);
+  FB.db = firebase.firestore(FB.app);
+  await FB.auth.signInAnonymously();
+  FB.connected = true;
+  setCloudStatus('☁️ Connected', 'var(--green-d)');
+}
+
+function firebaseSubscribe(){
+  if(!FB.db || FB.listening) return;
+  const [col, docId] = FB_DOC_PATH;
+  FB.db.collection(col).doc(docId).onSnapshot(snap => {
+    if(!snap.exists) return;
+    const remote = snap.data();
+    if(!remote || !remote.payload) return;
+    try {
+      const incoming = JSON.parse(remote.payload);
+      // Avoid echo loops: compare timestamps; only adopt if remote is newer than what we last pushed
+      if(remote.updatedBy === FB._lastClientId && remote.updatedAt && FB._lastPushAt && remote.updatedAt === FB._lastPushAt) return;
+      FB._suppressNextPush = true;
+      DATA = incoming;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+      setCloudStatus('☁️ Live · synced', 'var(--green-d)');
+      // re-render whatever's open
+      const active = document.querySelector('nav.tabs button.active');
+      if(active && currentSSM) showTab(active.dataset.tab);
+      if(adminUnlocked) showAdminPanel();
+    } catch(e){ console.warn('Failed to apply remote data:', e); }
+  }, err => {
+    console.warn('FB onSnapshot err:', err);
+    setCloudStatus('☁️ Offline', 'var(--red)');
+  });
+  FB.listening = true;
+}
+
+async function firebaseSave(){
+  if(!FB.db) return;
+  const [col, docId] = FB_DOC_PATH;
+  if(!FB._lastClientId) FB._lastClientId = 'c_' + Math.random().toString(36).slice(2,10);
+  const now = Date.now();
+  FB._lastPushAt = now;
+  await FB.db.collection(col).doc(docId).set({
+    payload: JSON.stringify(DATA),
+    updatedAt: now,
+    updatedBy: FB._lastClientId
+  }, {merge:true});
+  setCloudStatus('☁️ Live · synced', 'var(--green-d)');
+}
+
+async function enableCloudSync(){
+  const txt = document.getElementById('fbConfigInput').value;
+  try {
+    const cfg = parseFbConfigText(txt);
+    if(!cfg.projectId || !cfg.apiKey) throw new Error('Config must include projectId and apiKey');
+    setCloudStatus('☁️ Connecting…', 'var(--orange-d)');
+    await initFirebaseFromConfig(cfg);
+    setStoredFbConfig(cfg);
+    firebaseSubscribe();
+    // Try to pull existing data first; if remote is empty, push local
+    const [col, docId] = FB_DOC_PATH;
+    const snap = await FB.db.collection(col).doc(docId).get();
+    if(!snap.exists || !snap.data() || !snap.data().payload){
+      await firebaseSave();
+      toast('Cloud enabled · seeded with local data ☁️');
+    } else {
+      toast('Cloud enabled · listening for updates ☁️');
+    }
+  } catch(e){
+    setCloudStatus('☁️ Error', 'var(--red)');
+    toast('Cloud setup failed: ' + e.message);
+    console.error(e);
+  }
+}
+
+async function disableCloudSync(){
+  if(FB.app){ try { await FB.app.delete(); } catch(e){} }
+  FB.app=null; FB.db=null; FB.auth=null; FB.connected=false; FB.listening=false;
+  clearStoredFbConfig();
+  setCloudStatus('', '');
+  toast('Cloud sync disabled — local-only mode');
+}
+
+async function pushLocalToCloud(){
+  if(!FB.connected){ toast('Enable cloud sync first ⚠️'); return; }
+  await firebaseSave();
+  toast('Pushed local → cloud ⬆️');
+}
+
+async function pullCloudToLocal(){
+  if(!FB.connected){ toast('Enable cloud sync first ⚠️'); return; }
+  const [col, docId] = FB_DOC_PATH;
+  const snap = await FB.db.collection(col).doc(docId).get();
+  if(!snap.exists){ toast('No cloud data yet ⚠️'); return; }
+  const remote = snap.data();
+  if(!remote || !remote.payload){ toast('Cloud doc empty ⚠️'); return; }
+  if(!confirm('Replace your local data with cloud data?')) return;
+  FB._suppressNextPush = true;
+  DATA = JSON.parse(remote.payload);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+  toast('Pulled cloud → local ⬇️');
+  location.reload();
+}
+
+// Auto-init on boot if config saved
+async function autoInitFirebase(){
+  const cfg = getStoredFbConfig();
+  if(!cfg) return;
+  try {
+    setCloudStatus('☁️ Connecting…', 'var(--orange-d)');
+    await initFirebaseFromConfig(cfg);
+    firebaseSubscribe();
+    setCloudStatus('☁️ Live', 'var(--green-d)');
+  } catch(e){
+    console.warn('Auto-init FB failed:', e);
+    setCloudStatus('☁️ Offline', 'var(--red)');
+  }
 }
 
 /* ---------- Tabs / Navigation ---------- */
@@ -2681,16 +4422,38 @@ function renderLb(){
 function renderFocus(){
   const date = latestDate();
 
+  // ----- Helpers for absolute lag (outlets short) -----
+  // absLag(ssm, sku) = (target% - ecoPct%) × real1l_outlets / 100  (clamped to 0 if already at/above target)
+  // Total opportunity outlets across team = sum of per-SSM lags
+  function absLagSsmSku(ssmId, sku){
+    if(!sku || sku.isBase) return null;
+    const raw = (DATA.eco[date]||{})[ssmId];
+    if(!raw) return null;
+    const base = raw['real1l']; if(!base) return null;
+    const actual = raw[sku.id] ?? 0;
+    const need = sku.target * base / 100;
+    return Math.max(0, need - actual);
+  }
+  function teamAbsLagForSku(sku){
+    let sum=0, ok=false;
+    DATA.ssms.forEach(s => { const v = absLagSsmSku(s.id, sku); if(v!=null){ sum+=v; ok=true; }});
+    return ok ? sum : null;
+  }
+  function teamAbsLagForBrand(brand){
+    const ss = DATA.skus.filter(x=>!x.isBase && x.brand===brand);
+    let sum=0, ok=false;
+    ss.forEach(s => { const v = teamAbsLagForSku(s); if(v!=null){ sum+=v; ok=true; }});
+    return ok ? sum : null;
+  }
+
   // --- Team Focus SKU: single SKU with the largest team-wide gap to target ---
   const skuGaps = DATA.skus.filter(s=>!s.isBase).map(s => {
     const ps = DATA.ssms.map(ss => (ecoPctForSSM(ss.id,date)||{})[s.id]).filter(p=>p!=null);
     const avg = ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : 0;
-    return {s, avg, gap: s.target - avg, ps};
+    return {s, avg, gap: s.target - avg, absLag: teamAbsLagForSku(s) || 0, ps};
   }).sort((a,b)=>b.gap-a.gap);
   const focusSku = skuGaps[0];
-  // who's lagging this SKU most (3 SSMs)
-  const skuLag = DATA.ssms.map(ss => ({ss, p: (ecoPctForSSM(ss.id,date)||{})[focusSku.s.id]})).filter(x=>x.p!=null).sort((a,b)=>a.p-b.p).slice(0,3);
-  // who's the SKU champion
+  const skuLag = DATA.ssms.map(ss => ({ss, p: (ecoPctForSSM(ss.id,date)||{})[focusSku.s.id], lag: absLagSsmSku(ss.id, focusSku.s)})).filter(x=>x.p!=null).sort((a,b)=>b.lag-a.lag).slice(0,3);
   const skuChamp = DATA.ssms.map(ss => ({ss, p: (ecoPctForSSM(ss.id,date)||{})[focusSku.s.id]})).filter(x=>x.p!=null).sort((a,b)=>b.p-a.p)[0];
   document.getElementById('focusSkuHero').innerHTML = `
     <div class="label">🎯 Team Focus SKU of the Day</div>
@@ -2699,13 +4462,14 @@ function renderFocus(){
     <div class="nums">
       <div class="b"><div class="l">Team Avg</div><div class="v">${focusSku.avg.toFixed(1)}%</div></div>
       <div class="b"><div class="l">Target</div><div class="v">${focusSku.s.target}%</div></div>
-      <div class="b"><div class="l">Gap</div><div class="v">${focusSku.gap.toFixed(1)} pt</div></div>
+      <div class="b"><div class="l">% Gap</div><div class="v">${focusSku.gap.toFixed(1)} pt</div></div>
+      <div class="b"><div class="l">Outlets Short</div><div class="v">${Math.round(focusSku.absLag)}</div></div>
     </div>
     <div class="who">🏆 SKU Champion: <strong>${skuChamp.ss.emoji||''} ${skuChamp.ss.name}</strong> at ${skuChamp.p.toFixed(1)}%<br>
-    🎯 Coach first: <strong>${skuLag.map(l=>l.ss.name.split(' ')[0]).join(', ')}</strong></div>
+    🎯 Coach first (largest absolute lag): <strong>${skuLag.map(l=>`${l.ss.name.split(' ')[0]} (${Math.round(l.lag)})`).join(', ')}</strong></div>
   `;
 
-  // Brand-level avg gap to target
+  // Brand-level avg gap to target + absolute lag
   const brands = {};
   DATA.skus.filter(s=>!s.isBase).forEach(s=>{
     if(!brands[s.brand]) brands[s.brand]={skus:[], gapSum:0, n:0, avgPctSum:0, tgtSum:0};
@@ -2724,32 +4488,51 @@ function renderFocus(){
     b.avgPct = b.n ? b.avgPctSum/b.n : 0;
     b.avgTarget = b.n ? b.tgtSum/b.n : 0;
     b.avgGap = b.n ? b.gapSum/b.n : 0;
+    b.absLag = teamAbsLagForBrand(bn) || 0;
   });
-  const sorted = Object.entries(brands).sort((a,b)=>b[1].avgGap-a[1].avgGap);
-  const top = sorted[0];
+  // Rank by ABSOLUTE LAG (outlets short) — more actionable than % gap alone
+  const sorted = Object.entries(brands).sort((a,b)=>b[1].absLag - a[1].absLag);
+  const top1 = sorted[0];
+  const top2 = sorted[1];
 
-  // SKUs in focus brand sorted by team-wide gap
+  function renderBrandHero(rank, entry){
+    const [name, b] = entry;
+    const brandSkus = b.skus.map(s => {
+      const ps = DATA.ssms.map(ss=>(ecoPctForSSM(ss.id,date)||{})[s.id]).filter(p=>p!=null);
+      const avg = ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : 0;
+      return {s, avg, gap: s.target-avg, absLag: teamAbsLagForSku(s) || 0};
+    }).sort((a,b)=>b.absLag-a.absLag);
+    const why = rank===1
+      ? `💡 Biggest absolute opportunity — closing this gap activates the most outlets across the team.`
+      : `💡 Second-largest opportunity — pair it with the #1 focus for compounding impact.`;
+    return `
+      <div class="rank-tag">${rank===1 ? '🥇 Focus Brand #1' : '🥈 Focus Brand #2'}</div>
+      <div class="label">🔥 Focus Brand</div>
+      <div class="brand-name">${name}</div>
+      <div class="sub">Avg ECO ${b.avgPct.toFixed(1)}% vs target ${b.avgTarget.toFixed(1)}% · <strong>${b.avgGap.toFixed(1)} pt gap</strong> · <strong>~${Math.round(b.absLag)} outlets short</strong></div>
+      <div class="why">${why}</div>
+      <div class="focus-skus">
+        ${brandSkus.map(x => `
+          <div class="focus-sku">
+            <div class="n">${x.s.name}</div>
+            <div class="g">Target ${x.s.target}% · ~${Math.round(x.absLag)} outlets short</div>
+            <div class="v">${x.avg.toFixed(1)}% <span style="font-size:12px;opacity:.85">(gap ${x.gap.toFixed(1)})</span></div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  document.getElementById('focusHero').innerHTML = renderBrandHero(1, top1);
+  document.getElementById('focusHero2').innerHTML = top2 ? renderBrandHero(2, top2) : '';
+
+  // For playbook below, point at top1 brand's worst SKU
+  const top = top1;
   const focusBrandSkus = top[1].skus.map(s => {
     const ps = DATA.ssms.map(ss=>(ecoPctForSSM(ss.id,date)||{})[s.id]).filter(p=>p!=null);
     const avg = ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : 0;
-    return {s, avg, gap: s.target-avg};
-  }).sort((a,b)=>b.gap-a.gap);
-
-  document.getElementById('focusHero').innerHTML = `
-    <div class="label">🔥 Focus Brand of the Day</div>
-    <div class="brand-name">${top[0]}</div>
-    <div class="sub">Avg ECO ${top[1].avgPct.toFixed(1)}% vs target ${top[1].avgTarget.toFixed(1)}% · <strong>${top[1].avgGap.toFixed(1)} pt gap</strong></div>
-    <div class="why">💡 Biggest team-wide gap to target — moving this brand moves everyone's score the most.</div>
-    <div class="focus-skus">
-      ${focusBrandSkus.map(x => `
-        <div class="focus-sku">
-          <div class="n">${x.s.name}</div>
-          <div class="g">Target ${x.s.target}%</div>
-          <div class="v">${x.avg.toFixed(1)}% <span style="font-size:12px;opacity:.85">(gap ${x.gap.toFixed(1)})</span></div>
-        </div>
-      `).join('')}
-    </div>
-  `;
+    return {s, avg, gap: s.target-avg, absLag: teamAbsLagForSku(s) || 0};
+  }).sort((a,b)=>b.absLag-a.absLag);
 
   // brand chart
   const ctx = document.getElementById('focusBrandChart');
@@ -2757,18 +4540,26 @@ function renderFocus(){
   const bNames = sorted.map(x=>x[0]);
   const bAvg = sorted.map(x=>x[1].avgPct);
   const bTgt = sorted.map(x=>x[1].avgTarget);
+  const bAbsLag = sorted.map(x=>x[1].absLag);
   charts.focusBrand = new Chart(ctx, {
     type:'bar',
     data:{ labels:bNames,
       datasets:[
-        {label:'Team Avg ECO%', data:bAvg, backgroundColor: bNames.map(n=>BRAND_COLORS[n]), borderRadius:8, barPercentage:.55},
+        {label:'Team Avg ECO%', data:bAvg, backgroundColor: bNames.map(n=>BRAND_COLORS[n]||'#9ca3af'), borderRadius:8, barPercentage:.55},
         {label:'Avg Target', data:bTgt, type:'scatter', pointStyle:'rectRot', pointRadius:10, pointHoverRadius:12, backgroundColor:'#1f2937', borderColor:'#1f2937'}
       ]
     },
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{
         legend:{position:'bottom', labels:{usePointStyle:true, padding:14, font:{size:12, weight:'600'}}},
-        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.y||0).toFixed(1)}%`}}
+        tooltip:{callbacks:{
+          label:c=>`${c.dataset.label}: ${(c.parsed.y||0).toFixed(1)}%`,
+          afterBody:(items)=>{
+            if(!items.length) return '';
+            const idx = items[0].dataIndex;
+            return `Outlets short: ~${Math.round(bAbsLag[idx])}`;
+          }
+        }}
       },
       scales:{
         y:{ beginAtZero:true, ticks:{callback:v=>v+'%', font:{size:11}}, grid:{color:'rgba(0,0,0,.05)'} },
@@ -2781,8 +4572,11 @@ function renderFocus(){
   const pb = document.getElementById('playbook');
   const tips = [];
   const focusSkuName = focusBrandSkus[0].s.name;
-  tips.push(`Run a <strong>${top[0]} push day</strong> — focus all SSMs on the brand with the largest team gap.`);
-  tips.push(`Within ${top[0]}, prioritize <strong>${focusSkuName}</strong> (avg gap ${focusBrandSkus[0].gap.toFixed(1)} pts).`);
+  const top1Lag = Math.round(top1[1].absLag);
+  const top2Lag = top2 ? Math.round(top2[1].absLag) : 0;
+  tips.push(`🥇 <strong>${top1[0]}</strong> push day — biggest absolute opportunity (<strong>~${top1Lag} outlets short</strong>, ${top1[1].avgGap.toFixed(1)} pt avg gap).`);
+  if(top2) tips.push(`🥈 Pair with <strong>${top2[0]}</strong> as the secondary focus (<strong>~${top2Lag} outlets short</strong>, ${top2[1].avgGap.toFixed(1)} pt gap).`);
+  tips.push(`Within ${top1[0]}, prioritize <strong>${focusSkuName}</strong> — ~${Math.round(focusBrandSkus[0].absLag)} outlets short.`);
   // SSMs lagging this brand most
   const laggers = DATA.ssms.map(ss => {
     const ps = top[1].skus.map(s => ({t:s.target, p: (ecoPctForSSM(ss.id,date)||{})[s.id]})).filter(x=>x.p!=null);
@@ -3143,9 +4937,248 @@ function adminLogout(){
 function showAdminPanel(){
   document.getElementById('adminLogin').style.display='none';
   document.getElementById('adminPanel').style.display='block';
+  buildLmPeriodPicker();
+  buildLmTable();
   buildEcoTable();
   buildSSMEditor();
   buildSKUEditor();
+  // Pre-fill firebase config textarea if stored
+  const cfg = getStoredFbConfig();
+  const ta = document.getElementById('fbConfigInput');
+  if(ta && cfg && !ta.value){ ta.value = JSON.stringify(cfg, null, 2); }
+}
+
+/* ---------- LM (Last Month) data entry ---------- */
+function prevMonthKey(d){
+  d = d || new Date();
+  const y = d.getFullYear(), m = d.getMonth();
+  const prev = new Date(y, m-1, 1);
+  return prev.toISOString().slice(0,7);
+}
+function buildLmPeriodPicker(){
+  const sel = document.getElementById('lmPeriod');
+  if(!sel) return;
+  if(!DATA.lm) DATA.lm = {};
+  // Build a set of period options: prev month, this month, next month, plus any existing periods
+  const periods = new Set();
+  const now = new Date();
+  for(let i=3;i>=-1;i--){
+    const dt = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    periods.add(dt.toISOString().slice(0,7));
+  }
+  Object.keys(DATA.lm||{}).forEach(p => periods.add(p));
+  const sorted = [...periods].sort();
+  const cur = sel.value || prevMonthKey(now);
+  sel.innerHTML = sorted.map(p => {
+    const [y,m] = p.split('-').map(Number);
+    const lbl = new Date(y, m-1, 1).toLocaleDateString('en-IN',{month:'long', year:'numeric'});
+    return `<option value="${p}" ${p===cur?'selected':''}>${lbl}</option>`;
+  }).join('');
+  sel.onchange = buildLmTable;
+}
+
+function buildLmTable(){
+  const period = document.getElementById('lmPeriod').value;
+  if(!DATA.lm) DATA.lm = {};
+  const data = DATA.lm[period] || {};
+  const tbl = document.getElementById('lmTable');
+  const skus = DATA.skus; // include base too — LM real1l outlets matter
+  let head = '<tr><th class="ssm-col">SSM</th>' +
+    skus.map(s => `<th title="${s.name}${s.isBase?' (BASE)':''}">${s.name.replace('Real Activ Coconut Water','RACW')}${s.isBase?' ⭐':''}</th>`).join('') +
+    '</tr>';
+  let body = '';
+  DATA.ssms.forEach(ssm => {
+    const row = data[ssm.id] || {};
+    body += `<tr><td class="ssm-col">${ssm.emoji||''} ${ssm.name}</td>` +
+      skus.map(sku => `<td class="${sku.isBase?'base':''}"><input type="number" min="0" step="1" data-ssm="${ssm.id}" data-sku="${sku.id}" value="${row[sku.id] ?? ''}"/></td>`).join('') +
+      '</tr>';
+  });
+  tbl.innerHTML = head + body;
+}
+
+function saveLm(){
+  const period = document.getElementById('lmPeriod').value;
+  if(!period){ toast('Pick a period first ⚠️'); return; }
+  if(!DATA.lm) DATA.lm = {};
+  if(!DATA.lm[period]) DATA.lm[period] = {};
+  let count = 0;
+  document.querySelectorAll('#lmTable input').forEach(inp => {
+    const ssm = inp.dataset.ssm, sku = inp.dataset.sku;
+    const v = inp.value === '' ? null : Number(inp.value);
+    if(!DATA.lm[period][ssm]) DATA.lm[period][ssm] = {};
+    if(v == null) delete DATA.lm[period][ssm][sku];
+    else { DATA.lm[period][ssm][sku] = v; count++; }
+  });
+  saveData();
+  toast(`Saved ${count} LM values for ${period} ✅`);
+}
+
+function copyLmFromPrev(){
+  const period = document.getElementById('lmPeriod').value;
+  if(!DATA.lm) DATA.lm = {};
+  const all = Object.keys(DATA.lm).sort();
+  const idx = all.indexOf(period);
+  let src = null;
+  if(idx > 0) src = all[idx-1];
+  else if(all.length && all[0] !== period) src = all[all.length-1];
+  if(!src){ toast('No previous period to copy from ⚠️'); return; }
+  DATA.lm[period] = JSON.parse(JSON.stringify(DATA.lm[src]));
+  buildLmTable();
+  toast(`Copied from ${src} 📋`);
+}
+
+function clearLm(){
+  const period = document.getElementById('lmPeriod').value;
+  if(!period) return;
+  if(!confirm(`Clear all LM data for ${period}?`)) return;
+  if(DATA.lm) delete DATA.lm[period];
+  buildLmTable();
+  saveData();
+  toast('Cleared 🧹');
+}
+
+function downloadLmTemplate(){
+  const skuIds = DATA.skus.map(s => s.id);
+  const header = ['period','ssm_id','ssm_name', ...skuIds];
+  const lines = [header.join(',')];
+  const period = document.getElementById('lmPeriod').value || prevMonthKey();
+  DATA.ssms.forEach(s => {
+    lines.push([period, s.id, s.name, ...skuIds.map(()=>'')].join(','));
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `lm-eco-template-${period}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  toast('LM template downloaded ⬇️');
+}
+
+function uploadLmCSV(file){
+  if(!file) return;
+  const log = document.getElementById('lmLog');
+  log.innerHTML = 'Reading…';
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const text = reader.result.replace(/^﻿/, '');
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+      if(lines.length < 2) throw new Error('CSV needs header + data');
+      const header = parseCSVLine(lines[0]).map(c => c.trim().toLowerCase());
+      const periodIdx = header.indexOf('period');
+      const ssmIdIdx = header.indexOf('ssm_id');
+      const ssmNameIdx = header.indexOf('ssm_name');
+      if(periodIdx < 0) throw new Error('Missing column: period');
+      if(ssmIdIdx < 0 && ssmNameIdx < 0) throw new Error('Need ssm_id or ssm_name');
+      const skuCols = {};
+      DATA.skus.forEach(sk => {
+        const i = header.indexOf(sk.id.toLowerCase());
+        if(i >= 0) skuCols[sk.id] = i;
+      });
+      DATA.skus.forEach(sk => {
+        if(skuCols[sk.id] != null) return;
+        const i = header.indexOf(sk.name.toLowerCase());
+        if(i >= 0) skuCols[sk.id] = i;
+      });
+      if(!Object.keys(skuCols).length) throw new Error('No SKU columns found');
+      if(!DATA.lm) DATA.lm = {};
+      let added = 0, periods = new Set();
+      for(let r=1; r<lines.length; r++){
+        const cells = parseCSVLine(lines[r]);
+        const period = (cells[periodIdx]||'').trim();
+        if(!/^\d{4}-\d{2}$/.test(period)) continue;
+        let ssm = null;
+        if(ssmIdIdx>=0 && cells[ssmIdIdx]) ssm = DATA.ssms.find(s => s.id === cells[ssmIdIdx].trim());
+        if(!ssm && ssmNameIdx>=0 && cells[ssmNameIdx]){
+          const nm = cells[ssmNameIdx].trim().toLowerCase();
+          ssm = DATA.ssms.find(s => s.name.toLowerCase() === nm);
+        }
+        if(!ssm) continue;
+        if(!DATA.lm[period]) DATA.lm[period] = {};
+        if(!DATA.lm[period][ssm.id]) DATA.lm[period][ssm.id] = {};
+        Object.entries(skuCols).forEach(([skuId, idx]) => {
+          const raw = (cells[idx]||'').trim();
+          if(raw === '') return;
+          const n = Number(raw);
+          if(!isNaN(n)){ DATA.lm[period][ssm.id][skuId] = n; added++; }
+        });
+        periods.add(period);
+      }
+      saveData();
+      buildLmPeriodPicker();
+      buildLmTable();
+      log.innerHTML = `✅ Imported ${added} LM values across ${periods.size} period(s).`;
+      toast('LM CSV imported ✅');
+    } catch(e){
+      log.innerHTML = `<span style="color:var(--red)">❌ ${e.message}</span>`;
+      toast('Import failed ❌');
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* Import Salesman Card report (HTML-in-xls). Reads many files, accumulates LM ECO per SSM × SKU. */
+async function importSalesmanCard(files){
+  if(!files || !files.length) return;
+  const log = document.getElementById('lmLog');
+  log.innerHTML = `Reading ${files.length} file(s)…`;
+  const period = document.getElementById('lmPeriod').value;
+  if(!period){ log.innerHTML = '❌ Pick a period first'; return; }
+  if(!DATA.lm) DATA.lm = {};
+  if(!DATA.lm[period]) DATA.lm[period] = {};
+
+  // Normalize helpers
+  const norm = s => (s||'').toString().trim().toLowerCase().replace(/\s+/g,' ');
+
+  // Build lookup maps
+  const ssmByName = {};
+  DATA.ssms.forEach(s => { ssmByName[norm(s.name)] = s; });
+  const skuByName = {};
+  DATA.skus.forEach(s => { skuByName[norm(s.name)] = s; });
+
+  let matched = 0, unmatchedSsm = new Set(), unmatchedSku = new Set(), totalRows = 0;
+  for(const file of files){
+    const text = await file.text();
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    const tables = doc.querySelectorAll('table');
+    if(!tables.length){ continue; }
+    // Use the largest table
+    let bestTable = tables[0], bestRows = bestTable.querySelectorAll('tr').length;
+    tables.forEach(t => { const n = t.querySelectorAll('tr').length; if(n > bestRows){ bestTable=t; bestRows=n; } });
+    const rows = bestTable.querySelectorAll('tr');
+    if(rows.length < 2) continue;
+    const headers = [...rows[0].querySelectorAll('th,td')].map(c => norm(c.textContent));
+    const idxSsmName = headers.findIndex(h => h === 'ssm name');
+    const idxBrand = headers.findIndex(h => h === 'brand');
+    const idxEcoLm = headers.findIndex(h => h === 'eco lm');
+    if(idxSsmName < 0 || idxBrand < 0 || idxEcoLm < 0){
+      log.innerHTML = `<span style="color:var(--red)">❌ File "${file.name}" doesn't look like a Salesman Card report (need SSM Name, Brand, ECO LM columns)</span>`;
+      return;
+    }
+    for(let i=1;i<rows.length;i++){
+      const cells = [...rows[i].querySelectorAll('th,td')].map(c => c.textContent.trim());
+      if(cells.length < 5) continue;
+      totalRows++;
+      const ssmName = norm(cells[idxSsmName]);
+      const brandName = norm(cells[idxBrand]);
+      const lmVal = Number(cells[idxEcoLm]);
+      if(isNaN(lmVal)) continue;
+      const ssm = ssmByName[ssmName];
+      const sku = skuByName[brandName];
+      if(!ssm){ unmatchedSsm.add(cells[idxSsmName]); continue; }
+      if(!sku){ unmatchedSku.add(cells[idxBrand]); continue; }
+      if(!DATA.lm[period][ssm.id]) DATA.lm[period][ssm.id] = {};
+      DATA.lm[period][ssm.id][sku.id] = lmVal;
+      matched++;
+    }
+  }
+  saveData();
+  buildLmPeriodPicker();
+  buildLmTable();
+  let msg = `✅ Imported ${matched} of ${totalRows} rows into LM ${period}.`;
+  if(unmatchedSsm.size) msg += `<br>⚠️ Unmatched SSM names (${unmatchedSsm.size}): <code>${[...unmatchedSsm].slice(0,5).join(', ')}</code> — rename them in Configure SSMs to match the report.`;
+  if(unmatchedSku.size) msg += `<br>⚠️ Unmatched Brand names (${unmatchedSku.size}): <code>${[...unmatchedSku].slice(0,5).join(', ')}</code> — those brands aren't configured as SKUs.`;
+  log.innerHTML = msg;
+  toast(`Imported ${matched} LM values 🪄`);
 }
 
 function buildEcoTable(){
